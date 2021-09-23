@@ -60,7 +60,7 @@ SRC_HOST="$(arg_host $SRC)"
 NAME=$(get_vv_name "$DST")
 WWN=$(get_vv_wwn "$DST")
 
-SRC_HOST_3PAR=$(python ${DRIVER_PATH}/../../datastore/3par/3par.py hostExists -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+SRC_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py hostExists -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
                                                                         -p $PASSWORD -hs $SRC_HOST)
 
 if [ $? -ne 0 ]; then
@@ -104,12 +104,12 @@ log "Unmapping $DST from $SRC_HOST"
 ssh_exec_and_log "$SRC_HOST" "$FLUSH_CMD" \
     "Error flushing out mapping"
 
-python ${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
                                                         -n $NAME -hs $SRC_HOST
 
 if [ "$QOS_ENABLE" == "YES" ]; then
     log "Delete QoS Policy"
-    QOS=$(python ${DRIVER_PATH}/../../datastore/3par/3par.py deleteQosPolicy -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+    QOS=$(${DRIVER_PATH}/../../datastore/3par/3par.py deleteQosPolicy -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
                         -nt $NAMING_TYPE -n $NAME -vi $VMID)
 
     if [ $? -ne 0 ]; then
@@ -119,7 +119,7 @@ if [ "$QOS_ENABLE" == "YES" ]; then
 fi
 
 log "Remove disk from VM VV Set"
-VVSET=$(python ${DRIVER_PATH}/../../datastore/3par/3par.py deleteVolumeFromVVSet -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+VVSET=$(${DRIVER_PATH}/../../datastore/3par/3par.py deleteVolumeFromVVSet -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
                     -nt $NAMING_TYPE -n $NAME -vi $VMID)
 
 if [ $? -ne 0 ]; then

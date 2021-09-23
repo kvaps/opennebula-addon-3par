@@ -99,7 +99,7 @@ NAMING_TYPE="${XPATH_ELEMENTS[0]:-$NAMING_TYPE}"
 # Readonly is for ex. CDROM and no copy is created
 if [ "$CLONE" == "YES" ]; then
   # get VM disk WWN
-  NAME_WWN=$(python ${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $API_ENDPOINT -i $IP -s $SECURE \
+  NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $API_ENDPOINT -i $IP -s $SECURE \
                                                 -u $USERNAME -p $PASSWORD -nt $NAMING_TYPE -vi $VMID -id $DISK_ID)
 
   if [ $? -ne 0 ]; then
@@ -113,7 +113,7 @@ WWN=$(get_vv_wwn "$NAME_WWN")
 
 # revert snapshot
 log "Reverting snapshot $SNAP_ID"
-python ${DRIVER_PATH}/../../datastore/3par/3par.py revertSnapshot -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+${DRIVER_PATH}/../../datastore/3par/3par.py revertSnapshot -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
                               -p $PASSWORD -nt $NAMING_TYPE -id $DISK_ID -vi $VMID -si $SNAP_ID -vc $CLONE -o $ONLINE
 
 if [ $? -ne 0 ]; then

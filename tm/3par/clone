@@ -123,7 +123,7 @@ QOS_LATENCY="${XPATH_ELEMENTS[j++]:-$QOS_LATENCY}"
 # Start actions
 #-------------------------------------------------------------------------------
 
-NEW_NAME_WWN=$(python ${DRIVER_PATH}/../../datastore/3par/3par.py createVmClone -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+NEW_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVmClone -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
                                 -p $PASSWORD -nt $NAMING_TYPE -tpvv $THIN -tdvv $DEDUP -compr $COMPRESSION -sn $NAME \
                                 -vi $VMID -id $DISK_ID -c $CPG -sz $SIZE -co "$VM_NAME")
 
@@ -136,7 +136,7 @@ NEW_NAME=$(get_vv_name "$NEW_NAME_WWN")
 NEW_WWN=$(get_vv_wwn "$NEW_NAME_WWN")
 
 log "Add disk to VM VV Set"
-VVSET=$(python ${DRIVER_PATH}/../../datastore/3par/3par.py addVolumeToVVSet -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+VVSET=$(${DRIVER_PATH}/../../datastore/3par/3par.py addVolumeToVVSet -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
                     -nt $NAMING_TYPE -n $NEW_NAME -vi $VMID -co "$VM_NAME")
 
 if [ $? -ne 0 ]; then
@@ -146,7 +146,7 @@ fi
 
 if [ "$QOS_ENABLE" == "YES" ]; then
     log "Create QoS Policy"
-    QOS=$(python ${DRIVER_PATH}/../../datastore/3par/3par.py createQosPolicy -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+    QOS=$(${DRIVER_PATH}/../../datastore/3par/3par.py createQosPolicy -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
                         -nt $NAMING_TYPE -n $NEW_NAME -vi $VMID -qp $QOS_PRIORITY -qxi $QOS_MAX_IOPS -qmi $QOS_MIN_IOPS \
                         -qxb $QOS_MAX_BW -qmb $QOS_MIN_BW -ql $QOS_LATENCY)
 
@@ -158,7 +158,7 @@ fi
 
 log "Mapping $NEW_NAME_WWN to $DST_HOST"
 
-LUN=$(python ${DRIVER_PATH}/../../datastore/3par/3par.py exportVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py exportVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
                                                             -n $NEW_NAME -hs $DST_HOST)
 
 if [ $? -ne 0 ]; then

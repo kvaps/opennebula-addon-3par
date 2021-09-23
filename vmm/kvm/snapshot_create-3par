@@ -83,5 +83,5 @@ if [ $LCM_STATE -eq 24 ]; then
     fi
 fi
 
-python ${DRIVER_PATH}/../../datastore/3par/3par.py createVVSetSnapshot -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+${DRIVER_PATH}/../../datastore/3par/3par.py createVVSetSnapshot -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
                                                         -nt $NAMING_TYPE -vi $VMID -si $SNAP_ID
