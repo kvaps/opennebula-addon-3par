@@ -263,9 +263,9 @@ def monitorCPG(cl, args):
     free = cpgAvailableSpace.get('usableFreeMiB')
     total = used + free
 
-    print 'USED_MB={used}'.format(used=used)
-    print 'TOTAL_MB={total}'.format(total=total)
-    print 'FREE_MB={free}'.format(free=free)
+    print('USED_MB={used}'.format(used=used))
+    print('TOTAL_MB={total}'.format(total=total))
+    print('FREE_MB={free}'.format(free=free))
 
     if args.disks == True:
       import subprocess
@@ -286,6 +286,8 @@ def monitorCPG(cl, args):
         result = 'VM=[ID={vmId},POLL="'.format(vmId=vm.get('ID'))
         
         disks = vm.get('TEMPLATE').get('DISK')
+        if disks is None:
+          continue
         if isinstance(disks,dict):
           disks = [disks]
 
@@ -779,7 +781,7 @@ def deleteVVWithName(cl, name):
                     if i > 180:
                         # other issue, exiting
                         cl.logout()
-                        print ex
+                        print(ex)
                         exit(1)
                     i += 1
                     time.sleep(5)
@@ -831,13 +833,13 @@ cl.setSSHOptions(args.ip, args.username, args.password)
 try:
     cl.login(args.username, args.password)
 except exceptions.HTTPUnauthorized as ex:
-    print "Login failed."
+    print("Login failed.")
 
 try:
     globals()[args.task](cl, args)
     cl.logout()
 except Exception as ex:
     # something unexpected happened
-    print ex
+    print(ex)
     cl.logout()
     exit(1)
