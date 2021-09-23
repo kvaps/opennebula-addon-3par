@@ -298,14 +298,14 @@ def monitorCPG(cl, args):
             name = source[0]
           diskResult.append('DISK_SIZE=[ID={diskId},SIZE={diskSize}]'.format(diskId=disk.get('DISK_ID'), diskSize=diskSizes[name]))
        
-        print result + ' '.join(diskResult) + '"]'
+        print(result + ' '.join(diskResult) + '"]')
 
 def createVV(cl, args):
     name = createVVName(args.namingType, args.id)
 
     vv = createVVWithName(cl, name, args)
     wwn = vv.get('wwn').lower()
-    print '{name}:{wwn}'.format(name=name, wwn=wwn)
+    print('{name}:{wwn}'.format(name=name, wwn=wwn))
 
 def deleteVV(cl, args):
     name = createVVName(args.namingType, args.id)
@@ -324,7 +324,7 @@ def cloneVV(cl, args):
     cl.copyVolume(srcName, destName, args.cpg, optional)
 
     wwn = vv.get('wwn').lower()
-    print '{name}:{wwn}'.format(name=destName, wwn=wwn)
+    print('{name}:{wwn}'.format(name=destName, wwn=wwn))
 
 def copyVV(cl, args):
   if args.vmClone == True:
@@ -343,11 +343,11 @@ def getVVSize(cl, args):
     vv = cl.getVolume(args.name)
 
     if args.type == 'USED':
-        print vv.get('userSpace').get('usedMiB')
+        print(vv.get('userSpace').get('usedMiB'))
     elif args.type == 'SNAP':
-        print vv.get('snapshotSpace').get('usedMiB')
+        print(vv.get('snapshotSpace').get('usedMiB'))
     elif args.type == 'VSIZE':
-        print vv.get('sizeMiB')
+        print(vv.get('sizeMiB'))
 
 def exportVV(cl, args):
     name = args.name
@@ -358,7 +358,7 @@ def exportVV(cl, args):
         vluns = cl.getHostVLUNs(host)
         for vlun in vluns:
             if vlun.get('volumeName') == name:
-                print vlun.get('lun')
+                print(vlun.get('lun'))
                 return
     except exceptions.HTTPNotFound:
         pass
@@ -368,7 +368,7 @@ def exportVV(cl, args):
     while not done:
         try:
             location = cl.createVLUN(name, None, host, None, None, None, True)
-            print location.split(',')[1]
+            print(location.split(',')[1])
             return
         except exceptions.HTTPConflict:
             time.sleep(5)
@@ -411,14 +411,14 @@ def createVmClone(cl, args):
             if i > 5:
                 cl.deleteVolume(destName)
                 cl.logout()
-                print ex
+                print(ex)
                 exit(1)
             i += 1
             time.sleep(1)
 
     # print info
     wwn = vv.get('wwn').lower()
-    print '{name}:{wwn}'.format(name=destName, wwn=wwn)
+    print('{name}:{wwn}'.format(name=destName, wwn=wwn))
 
 def createVmVV(cl, args):
     name = createVmCloneName(args.namingType, args.id, args.vmId)
@@ -428,13 +428,13 @@ def createVmVV(cl, args):
 
     # print info
     wwn = vv.get('wwn').lower()
-    print '{name}:{wwn}'.format(name=name, wwn=wwn)
+    print('{name}:{wwn}'.format(name=name, wwn=wwn))
 
 def getVmClone(cl, args):
     name = createVmCloneName(args.namingType, args.id, args.vmId)
     vv = cl.getVolume(name)
     wwn = vv.get('wwn').lower()
-    print '{name}:{wwn}'.format(name=name, wwn=wwn)
+    print('{name}:{wwn}'.format(name=name, wwn=wwn))
 
 def deleteVmClone(cl, args):
     name = createVmCloneName(args.namingType, args.id, args.vmId)
@@ -451,12 +451,12 @@ def createVVSetSnapshot(cl, args):
         vvset = cl.getVolumeSet(vvsetName)
         members = vvset.get('setmembers')
     except exceptions.HTTPNotFound:
-        print 'Volume set does not exits, exiting...'
+        print('Volume set does not exits, exiting...')
         return
 
     # no members in volume set? unexpected
     if not members or not len(members) > 0:
-        print 'Volume set has no members, exiting...'
+        print('Volume set has no members, exiting...')
         return
 
     # check for soft deleted snapshot
@@ -481,7 +481,7 @@ def createVVSetSnapshot(cl, args):
         snapName, metaKey = createSnapshotNameAndMetaKey(member, snapId)
         cl.setVolumeMetaData(member, metaKey, snapName)
 
-    print args.snapId
+    print(args.snapId)
 
 
 def deleteVVSetSnapshot(cl, args):
@@ -493,12 +493,12 @@ def deleteVVSetSnapshot(cl, args):
         vvset = cl.getVolumeSet(vvsetName)
         members = vvset.get('setmembers')
     except exceptions.HTTPNotFound:
-        print 'Volume set does not exits, exiting...'
+        print('Volume set does not exits, exiting...')
         return
 
     # no members in volume set? unexpected
     if not members or not len(members) > 0:
-        print 'Volume set has no members, exiting...'
+        print('Volume set has no members, exiting...')
         return
 
     # iterate over volumes and find snapshots to delete
@@ -613,9 +613,9 @@ def hostExists(cl, args):
     try:
         cl.getHost(args.host)
     except exceptions.HTTPNotFound:
-        print 0
+        print(0)
         return
-    print 1
+    print(1)
 
 def addVolumeToVVSet(cl, args):
     vvsetName = '{namingType}.one.vm.{vmId}.vvset'.format(namingType=args.namingType, vmId=args.vmId)
@@ -624,14 +624,14 @@ def addVolumeToVVSet(cl, args):
     try:
         cl.getVolumeSet(vvsetName)
     except exceptions.HTTPNotFound:
-        print 'Volume Set does not exists, create new'
+        print('Volume Set does not exists, create new')
         cl.createVolumeSet(vvsetName, None, args.comment)
 
     # add volume to vvset
     try:
         cl.addVolumeToVolumeSet(vvsetName, args.name)
     except exceptions.HTTPConflict as ex:
-        print 'VV already mapped to VV Set'
+        print('VV already mapped to VV Set')
 
 
 def deleteVolumeFromVVSet(cl, args):
@@ -641,14 +641,14 @@ def deleteVolumeFromVVSet(cl, args):
     try:
         cl.removeVolumeFromVolumeSet(vvsetName, args.name)
     except exceptions.HTTPNotFound:
-        print 'Volume is already removed from vv set'
+        print('Volume is already removed from vv set')
 
     # get volume set info
     try:
         vvset = cl.getVolumeSet(vvsetName)
         members = vvset.get('setmembers')
     except exceptions.HTTPNotFound:
-        print 'Volume set does not exits, exiting...'
+        print('Volume set does not exits, exiting...')
         return
 
     # if there are other members them we do not remove VV Set
@@ -659,7 +659,7 @@ def deleteVolumeFromVVSet(cl, args):
     try:
         cl.deleteVolumeSet(vvsetName)
     except exceptions.HTTPNotFound:
-        print 'VV Set already does not exits'
+        print('VV Set already does not exits')
 
 
 def createQosPolicy(cl, args):
@@ -675,11 +675,11 @@ def createQosPolicy(cl, args):
                 k = 'enabled'
             if qos.get(k) != v:
                 # not match, update
-                print 'QoS Policy Rules changed, need update'
+                print('QoS Policy Rules changed, need update')
                 cl.modifyQoSRules(vvsetName, qosRules)
                 break
     except exceptions.HTTPNotFound:
-        print 'QoS Policy does not exists, create new'
+        print('QoS Policy does not exists, create new')
         cl.createQoSRules(vvsetName, qosRules)
 
 
@@ -691,7 +691,7 @@ def deleteQosPolicy(cl, args):
         vvset = cl.getVolumeSet(vvsetName)
         members = vvset.get('setmembers')
     except exceptions.HTTPNotFound:
-        print 'Volume set does not exits, exiting...'
+        print('Volume set does not exits, exiting...')
         return
 
     # if there are other members them we do not remove QoS Policy
@@ -702,7 +702,7 @@ def deleteQosPolicy(cl, args):
     try:
         cl.deleteQoSRules(vvsetName)
     except exceptions.HTTPNotFound:
-        print 'QoS Policy already does not exits'
+        print('QoS Policy already does not exits')
 
 
 # ----------------
