@@ -212,6 +212,17 @@ hostExistsParser = subparsers.add_parser('hostExists', parents=[commonParser],
                                          help='Check if host with this name is registered')
 hostExistsParser.add_argument('-hs', '--host', help='Name of host', required=True)
 
+# DeleteHost task parser
+deleteHostParser = subparsers.add_parser('deleteHost', parents=[commonParser],
+                                         help='Delete host')
+deleteHostParser.add_argument('-hs', '--host', help='Name of host', required=True)
+
+# CreateHost task parser
+createHostParser = subparsers.add_parser('createHost', parents=[commonParser],
+                                         help='Create host')
+createHostParser.add_argument('-hs', '--host', help='Name of host', required=True)
+createHostParser.add_argument('-in', '--iscsiNames', help='Comma separated iSCSI IQN names for the host', required=False, default='')
+
 # AddVolumeToVVSet task parser
 addVolumeToVVSetParser = subparsers.add_parser('addVolumeToVVSet', parents=[commonParser],
                                               help='Add volume to VM VV set. If VV set not exists, it creates new one')
@@ -619,6 +630,12 @@ def hostExists(cl, args):
         print(0)
         return
     print(1)
+
+def deleteHost(cl, args):
+    cl.deleteHost(args.host)
+
+def createHost(cl, args):
+    cl.createHost(args.host, iscsiNames=args.iscsiNames.split(','))
 
 def addVolumeToVVSet(cl, args):
     vvsetName = '{namingType}.one.vm.{vmId}.vvset'.format(namingType=args.namingType, vmId=args.vmId)
