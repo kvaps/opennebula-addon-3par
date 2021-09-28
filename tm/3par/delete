@@ -211,6 +211,9 @@ EOF
     error_message "Error unexporting VV"
     exit 1
   fi
+
+  ${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                                        -hs $DST_HOST || true
 fi
 
 if [ "$QOS_ENABLE" == "YES" ]; then

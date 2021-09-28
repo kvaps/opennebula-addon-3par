@@ -107,6 +107,9 @@ ssh_exec_and_log "$SRC_HOST" "$FLUSH_CMD" \
 ${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
                                                         -n $NAME -hs $SRC_HOST
 
+  ${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                                        -hs $SRC_HOST || true
+
 if [ "$QOS_ENABLE" == "YES" ]; then
     log "Delete QoS Policy"
     QOS=$(${DRIVER_PATH}/../../datastore/3par/3par.py deleteQosPolicy -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
