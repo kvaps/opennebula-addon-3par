@@ -44,7 +44,7 @@ commonParser.add_argument('-i', '--ip', help='3PAR IP for SSH authentication opt
                           required=True)
 commonParser.add_argument('-u', '--username', help='3PAR username', required=True)
 commonParser.add_argument('-p', '--password', help='3PAR password', required=True)
-commonParser.add_argument('-sd', '--softDelete', help='Soft-delete volumes/snapshots', type=boolarg, default=True)
+commonParser.add_argument('-sd', '--softDelete', help='Soft-delete volumes/snapshots', type=boolarg, default=False)
 
 # MonitorCPG task parser
 monitorCPGParser = subparsers.add_parser('monitorCPG', parents=[commonParser], help='Get CPG Available Space')
@@ -222,6 +222,12 @@ createHostParser = subparsers.add_parser('createHost', parents=[commonParser],
                                          help='Create host')
 createHostParser.add_argument('-hs', '--host', help='Name of host', required=True)
 createHostParser.add_argument('-in', '--iscsiNames', help='Comma separated iSCSI IQN names for the host', required=False, default='')
+
+# AddHostIscsiNames task parser
+addHostIscsiNamesParser = subparsers.add_parser('addHostIscsiNames', parents=[commonParser],
+                                         help='Create host')
+addHostIscsiNamesParser.add_argument('-hs', '--host', help='Name of host', required=True)
+addHostIscsiNamesParser.add_argument('-in', '--iscsiNames', help='Comma separated iSCSI IQN names for the host', required=True, default='')
 
 # AddVolumeToVVSet task parser
 addVolumeToVVSetParser = subparsers.add_parser('addVolumeToVVSet', parents=[commonParser],
@@ -636,6 +642,21 @@ def deleteHost(cl, args):
 
 def createHost(cl, args):
     cl.createHost(args.host, iscsiNames=args.iscsiNames.split(','))
+
+def addHostIscsiNames(cl, args):
+    host = cl.getHost(args.host)
+    newIscsiNames = []
+    for iscsiName in args.iscsiNames.split(','):
+        nameExists = False
+        for iscsiPath in host['iSCSIPaths']:
+            if iscsiPath['name'] == iscsiName:
+                nameExists = True
+                break
+        if nameExists:
+            continue
+        newIscsiNames.append(iscsiName)
+    if len(newIscsiNames) != 0:
+        cl.modifyHost(args.host, mod_request={'pathOperation': 1, 'iSCSINames': newIscsiNames})
 
 def addVolumeToVVSet(cl, args):
     vvsetName = '{namingType}.one.vm.{vmId}.vvset'.format(namingType=args.namingType, vmId=args.vmId)
