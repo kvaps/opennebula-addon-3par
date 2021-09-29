@@ -126,20 +126,22 @@ CLONE="${XPATH_ELEMENTS[2]}"
 PERSISTENT="${XPATH_ELEMENTS[3]}"
 SYS_DSID="${XPATH_ELEMENTS[4]}"
 
+#-------------------------------------------------------------------------------
+# Get system ds information
+#-------------------------------------------------------------------------------
+
+unset i j XPATH_ELEMENTS
+
+while IFS= read -r -d '' element; do
+    XPATH_ELEMENTS[i++]="$element"
+done < <(onedatastore show -x $SYS_DSID | $XPATH /DATASTORE/TEMPLATE/NAMING_TYPE \
+                                                 /DATASTORE/TEMPLATE/PORTALS)
+
+NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
+PORTALS="${XPATH_ELEMENTS[J++]:-$PORTALS}"
+
 # Disk os clone, so copy was created
-if [ "$CLONE" == "YES" ]; then
-  #-------------------------------------------------------------------------------
-  # Get system ds information
-  #-------------------------------------------------------------------------------
-  
-  unset i XPATH_ELEMENTS
-  
-  while IFS= read -r -d '' element; do
-      XPATH_ELEMENTS[i++]="$element"
-  done < <(onedatastore show -x $SYS_DSID | $XPATH /DATASTORE/TEMPLATE/NAMING_TYPE)
-  
-  NAMING_TYPE="${XPATH_ELEMENTS[0]:-$NAMING_TYPE}"
-  
+if [ "$CLONE" = "YES" ]; then
   # get VM disk WWN
   NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
                                                                 -p $PASSWORD -nt $NAMING_TYPE -vi $VMID -id $DISK_ID)
@@ -213,18 +215,25 @@ EOF
     fi
 
     ${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                                                                -hs $SRC_HOST || true
+                                                                -hs $SRC_HOST
+    if [ $? -eq 0 ]; then
+        ssh_exec_and_log "$DST_HOST" "
+        for PORTAL in $PORTALS; do
+            sudo iscsiadm --mode node -u -p \"\$PORTAL\" || true
+        done
+        "
+    fi
 fi
 
 if [ "$DST_HOST_3PAR" == "0" ]; then
-    DST_HOST_ISCSI_NAME=$($SSH $DST_HOST awk -F= '{print $2}' /etc/iscsi/initiatorname.iscsi)
+    DST_HOST_ISCSI_NAME=$($SSH $DST_HOST sudo cat /etc/iscsi/initiatorname.iscsi | awk -F= '{print $2}')
     ${DRIVER_PATH}/../../datastore/3par/3par.py createHost -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                                                                -hs $DST_HOST -in "$DST_HOST_ISCSI_NAME" || true
+                                                                -hs $DST_HOST -in $DST_HOST_ISCSI_NAME
     ssh_exec_and_log "$DST_HOST" "
-    for PORTAL in 10.39.120.13 10.39.120.14 10.39.120.15 10.39.120.16; do
+    for PORTAL in $PORTALS; do
         if ! sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -q \"\$PORTAL[:,]\"; then
-          sudo iscsiadm -m discovery -t sendtargets -p \"\$PORTAL\"
-          sudo iscsiadm -m node -l all -p \"\$PORTAL\"
+            sudo iscsiadm -m discovery -t sendtargets -p \"\$PORTAL\"
+            sudo iscsiadm -m node -l all -p \"\$PORTAL\"
         fi
     done
     "
