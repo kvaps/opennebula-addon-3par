@@ -223,12 +223,6 @@ createHostParser = subparsers.add_parser('createHost', parents=[commonParser],
 createHostParser.add_argument('-hs', '--host', help='Name of host', required=True)
 createHostParser.add_argument('-in', '--iscsiNames', help='Comma separated iSCSI IQN names for the host', required=False, default='')
 
-# AddHostIscsiNames task parser
-addHostIscsiNamesParser = subparsers.add_parser('addHostIscsiNames', parents=[commonParser],
-                                         help='Create host')
-addHostIscsiNamesParser.add_argument('-hs', '--host', help='Name of host', required=True)
-addHostIscsiNamesParser.add_argument('-in', '--iscsiNames', help='Comma separated iSCSI IQN names for the host', required=True, default='')
-
 # AddVolumeToVVSet task parser
 addVolumeToVVSetParser = subparsers.add_parser('addVolumeToVVSet', parents=[commonParser],
                                               help='Add volume to VM VV set. If VV set not exists, it creates new one')
@@ -641,12 +635,18 @@ def deleteHost(cl, args):
     cl.deleteHost(args.host)
 
 def createHost(cl, args):
-    cl.createHost(args.host, iscsiNames=args.iscsiNames.split(','))
+    iscsiNames = prepareIscsiNames(args)
+    try:
+        host = cl.getHost(args.host)
+    except exceptions.HTTPNotFound:
+        cl.createHost(args.host, iscsiNames=iscsiNames)
+    else:
+        if len(iscsiNames) != 0:
+            addHostIscsiNames(host, iscsiNames)
 
-def addHostIscsiNames(cl, args):
-    host = cl.getHost(args.host)
+def addHostIscsiNames(host, iscsiNames):
     newIscsiNames = []
-    for iscsiName in args.iscsiNames.split(','):
+    for iscsiName in iscsiNames:
         nameExists = False
         for iscsiPath in host['iSCSIPaths']:
             if iscsiPath['name'] == iscsiName:
@@ -853,6 +853,14 @@ def prepareQosRules(args):
         qosRules['priority'] = 3
 
     return qosRules
+
+def prepareIscsiNames(args):
+    if args.iscsiNames == "":
+        return []
+    else:
+        return args.iscsiNames.split(',')
+
+
 
 # -------------------------------------
 # Parse args and proceed with execution
