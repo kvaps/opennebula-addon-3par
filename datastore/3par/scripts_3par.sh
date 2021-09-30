@@ -133,3 +133,8 @@ function remove_lun {
       fi
 EOF
 }
+
+# Dummy ssh-agent function to support OpenNebula <5.12
+if ! declare -F ssh_forward >/dev/null; then
+    ssh_forward(){ "$@"; }
+fi
