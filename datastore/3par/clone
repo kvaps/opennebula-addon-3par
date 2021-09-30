@@ -69,8 +69,9 @@ SIZE="${XPATH_ELEMENTS[i++]}"
 CLONING_ID="${XPATH_ELEMENTS[i++]}"
 
 # Get source image properties
-unset i XPATH_ELEMENTS
 XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
+unset i XPATH_ELEMENTS
+
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
 done < <(oneimage show -x $CLONING_ID| $XPATH \
@@ -79,8 +80,9 @@ done < <(oneimage show -x $CLONING_ID| $XPATH \
 SRC_DSID=${XPATH_ELEMENTS[0]}
 
 # Get source datastore properties
-unset i XPATH_ELEMENTS
 XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
+unset i XPATH_ELEMENTS
+
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
 done < <(onedatastore show -x $SRC_DSID | $XPATH /DATASTORE/TEMPLATE/NAMING_TYPE)

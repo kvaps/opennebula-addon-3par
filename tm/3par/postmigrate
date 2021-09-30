@@ -102,6 +102,7 @@ for j in `seq 1 ${#DISK_IDS[*]}`; do
     # Readonly and not clone, so this disk can be used by more VMs at the same time
     if [ "$CLONE" == "NO" ] && [ "$READONLY" == "YES" ]; then
         # check if disk is in use by other VMs
+        XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
         unset i XPATH_ELEMENTS
 
         while IFS= read -r -d '' element; do
@@ -120,6 +121,7 @@ for j in `seq 1 ${#DISK_IDS[*]}`; do
             # Get system ds information
             #-------------------------------------------------------------------------------
 
+            XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
             unset i j XPATH_ELEMENTS
 
             while IFS= read -r -d '' element; do
