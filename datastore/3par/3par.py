@@ -393,7 +393,12 @@ def unexportVV(cl, args):
 
     # check if VLUN exists
     found = False
-    vluns = cl.getHostVLUNs(host)
+    try:
+        vluns = cl.getHostVLUNs(host)
+    except exceptions.HTTPNotFound:
+        print('No VLUNs for host found, exiting...')
+        return
+
     for vlun in vluns:
         if vlun.get('volumeName') == name:
             found = True
@@ -402,7 +407,11 @@ def unexportVV(cl, args):
     if found == False:
         return
 
-    cl.deleteVLUN(name, vlun.get('lun'), host)
+    try:
+        cl.deleteVLUN(name, vlun.get('lun'), host)
+    except exceptions.HTTPNotFound:
+        print('Volume export does not exits, exiting...')
+        return
 
 def createVmClone(cl, args):
     destName = createVmCloneName(args.namingType, args.id, args.vmId)
