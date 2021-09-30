@@ -110,7 +110,7 @@ ${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $API_ENDPOINT -i $IP -
                                                         -n $NAME -hs $SRC_HOST
 
 ${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                                                        -hs $SRC_HOST
+                                                        -hs $SRC_HOST >/dev/null
 
 if [ $? -eq 0 ]; then
     ssh_exec_and_log "$SRC_HOST" "
