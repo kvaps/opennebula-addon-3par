@@ -119,7 +119,7 @@ DISK_ID=$(echo "$DST_PATH" | $AWK -F. '{print $NF}')
 
 XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
 
-unset i XPATH_ELEMENTS
+unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
@@ -130,11 +130,11 @@ done < <(onevm show -x $VMID| $XPATH \
                     /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/PERSISTENT \
                     /VM/HISTORY_RECORDS/HISTORY[last\(\)]/DS_ID)
 
-NAME_WWN="${XPATH_ELEMENTS[0]}"
-IMAGE_ID="${XPATH_ELEMENTS[1]}"
-CLONE="${XPATH_ELEMENTS[2]}"
-PERSISTENT="${XPATH_ELEMENTS[3]}"
-SYS_DSID="${XPATH_ELEMENTS[4]}"
+NAME_WWN="${XPATH_ELEMENTS[j++]}"
+IMAGE_ID="${XPATH_ELEMENTS[j++]}"
+CLONE="${XPATH_ELEMENTS[j++]}"
+PERSISTENT="${XPATH_ELEMENTS[j++]}"
+SYS_DSID="${XPATH_ELEMENTS[j++]}"
 
 #-------------------------------------------------------------------------------
 # Get system ds information
@@ -185,13 +185,13 @@ CAN_UNMAP=1
 if ! [[ "$LCM_STATE" =~ ^(9|31|49|50)$ ]]; then
     if [ "$PERSISTENT" != "YES" ] && [ "$CLONE" == "NO" ]; then
         # check if disk is in use by other VMs
-        unset i XPATH_ELEMENTS
+        unset i j XPATH_ELEMENTS
     
         while IFS= read -r -d '' element; do
             XPATH_ELEMENTS[i++]="$element"
         done < <(oneimage show -x $IMAGE_ID| $XPATH /IMAGE/RUNNING_VMS)
     
-        RUNNING_VMS="${XPATH_ELEMENTS[0]}"
+        RUNNING_VMS="${XPATH_ELEMENTS[j++]}"
     
         # image is used, so can't unmap
         [ "$RUNNING_VMS" != "1" ] && CAN_UNMAP=0

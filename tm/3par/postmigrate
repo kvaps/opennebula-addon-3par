@@ -79,7 +79,7 @@ done < <(onevm show $VMID --all | $GREP -w "DISK_ID" | $CUT -d\" -f2)
 for j in `seq 1 ${#DISK_IDS[*]}`; do
     XPATH="${DRIVER_PATH}/../../datastore/xpath.rb -b $TEMPLATE_64"
 
-    unset i k XPATH_ELEMENTS
+    unset i j XPATH_ELEMENTS
 
     while IFS= read -r -d '' element; do
         XPATH_ELEMENTS[i++]="$element"
@@ -91,25 +91,25 @@ for j in `seq 1 ${#DISK_IDS[*]}`; do
                         /VM/TEMPLATE/DISK[DISK_ID=${DISK_IDS[$j]}]/DISK_ID \
                         /VM/HISTORY_RECORDS/HISTORY[last\(\)]/DS_ID)
 
-    NAME_WWN=${XPATH_ELEMENTS[k++]}
-    TM_MAD=${XPATH_ELEMENTS[k++]}
-    CLONE=${XPATH_ELEMENTS[k++]}
-    READONLY=${XPATH_ELEMENTS[k++]}
-    IMAGE_ID=${XPATH_ELEMENTS[k++]}
-    DISK_ID=${XPATH_ELEMENTS[k++]}
-    SYS_DSID=${XPATH_ELEMENTS[k++]}
+    NAME_WWN=${XPATH_ELEMENTS[j++]}
+    TM_MAD=${XPATH_ELEMENTS[j++]}
+    CLONE=${XPATH_ELEMENTS[j++]}
+    READONLY=${XPATH_ELEMENTS[j++]}
+    IMAGE_ID=${XPATH_ELEMENTS[j++]}
+    DISK_ID=${XPATH_ELEMENTS[j++]}
+    SYS_DSID=${XPATH_ELEMENTS[j++]}
 
     # Readonly and not clone, so this disk can be used by more VMs at the same time
     if [ "$CLONE" == "NO" ] && [ "$READONLY" == "YES" ]; then
         # check if disk is in use by other VMs
         XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
-        unset i XPATH_ELEMENTS
+        unset i j XPATH_ELEMENTS
 
         while IFS= read -r -d '' element; do
             XPATH_ELEMENTS[i++]="$element"
         done < <(oneimage show -x $IMAGE_ID| $XPATH /IMAGE/RUNNING_VMS)
 
-        RUNNING_VMS="${XPATH_ELEMENTS[0]}"
+        RUNNING_VMS="${XPATH_ELEMENTS[j++]}"
 
         # image is used, so exit
         [ "$RUNNING_VMS" != "1" ] && exit 0

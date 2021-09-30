@@ -60,13 +60,13 @@ DSID=$5
 
 XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
 
-unset i XPATH_ELEMENTS
+unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
 done < <(onedatastore show -x $DSID | $XPATH /DATASTORE/TEMPLATE/CPG)
 
-CPG="${XPATH_ELEMENTS[0]:-$CPG}"
+CPG="${XPATH_ELEMENTS[j++]:-$CPG}"
 
 #-------------------------------------------------------------------------------
 # Get Image information
@@ -74,7 +74,7 @@ CPG="${XPATH_ELEMENTS[0]:-$CPG}"
 
 DISK_ID=$(basename ${SRC} | cut -d. -f2)
 
-unset i XPATH_ELEMENTS
+unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
@@ -83,21 +83,21 @@ done < <(onevm show -x $VMID| $XPATH \
                     /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/CLONE \
                     /VM/HISTORY_RECORDS/HISTORY[last\(\)]/DS_ID)
 
-IMAGE_ID="${XPATH_ELEMENTS[0]}"
-CLONE="${XPATH_ELEMENTS[1]}"
-SYS_DSID="${XPATH_ELEMENTS[2]}"
+IMAGE_ID="${XPATH_ELEMENTS[j++]}"
+CLONE="${XPATH_ELEMENTS[j++]}"
+SYS_DSID="${XPATH_ELEMENTS[j++]}"
 
 #-------------------------------------------------------------------------------
 # Get system ds information
 #-------------------------------------------------------------------------------
 
-unset i XPATH_ELEMENTS
+unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
 done < <(onedatastore show -x $SYS_DSID | $XPATH /DATASTORE/TEMPLATE/NAMING_TYPE)
 
-NAMING_TYPE="${XPATH_ELEMENTS[0]:-$NAMING_TYPE}"
+NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 
 NAME=$(get_vv_name "$DST")
 

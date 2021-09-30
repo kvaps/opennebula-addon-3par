@@ -44,13 +44,13 @@ ID=$2
 
 XPATH="${DRIVER_PATH}/../xpath.rb -b $DRV_ACTION"
 
-unset i XPATH_ELEMENTS
+unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
 done < <($XPATH     /DS_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/CPG)
 
-CPG="${XPATH_ELEMENTS[0]:-$CPG}"
+CPG="${XPATH_ELEMENTS[j++]:-$CPG}"
 
 # ------------ Compute datastore usage -------------
 

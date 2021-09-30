@@ -123,13 +123,13 @@ LAST_HOST="${XPATH_ELEMENTS[j++]}"
 # Not persistent and not clone, so this disk can be used by more VMs at the same time
 if [ "$CLONE" == "NO" ] && [ "$DISK_TYPE" == "BLOCK" ]; then
     # check if disk is in use by other VMs
-    unset i XPATH_ELEMENTS
+    unset i j XPATH_ELEMENTS
 
     while IFS= read -r -d '' element; do
         XPATH_ELEMENTS[i++]="$element"
     done < <(oneimage show -x $IMAGE_ID| $XPATH /IMAGE/RUNNING_VMS)
 
-    RUNNING_VMS="${XPATH_ELEMENTS[0]}"
+    RUNNING_VMS="${XPATH_ELEMENTS[j++]}"
 
     # image is used, so exit
     [ "$RUNNING_VMS" != "1" ] && exit 0

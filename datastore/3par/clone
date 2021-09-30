@@ -42,7 +42,7 @@ ID=$2
 
 XPATH="${DRIVER_PATH}/../xpath.rb -b $DRV_ACTION"
 
-unset i XPATH_ELEMENTS
+unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
@@ -56,38 +56,36 @@ done < <($XPATH     /DS_DRIVER_ACTION_DATA/DATASTORE/ID \
                     /DS_DRIVER_ACTION_DATA/IMAGE/SIZE \
                     /DS_DRIVER_ACTION_DATA/IMAGE/CLONING_ID)
 
-unset i
-
-DSID="${XPATH_ELEMENTS[i++]}"
-CPG="${XPATH_ELEMENTS[i++]:-$CPG}"
-THIN="${XPATH_ELEMENTS[i++]:-$THIN}"
-DEDUP="${XPATH_ELEMENTS[i++]:-$DEDUP}"
-COMPRESSION="${XPATH_ELEMENTS[i++]:-$COMPRESSION}"
-NAMING_TYPE="${XPATH_ELEMENTS[i++]:-$NAMING_TYPE}"
-NAME="${XPATH_ELEMENTS[i++]}"
-SIZE="${XPATH_ELEMENTS[i++]}"
-CLONING_ID="${XPATH_ELEMENTS[i++]}"
+DSID="${XPATH_ELEMENTS[j++]}"
+CPG="${XPATH_ELEMENTS[j++]:-$CPG}"
+THIN="${XPATH_ELEMENTS[j++]:-$THIN}"
+DEDUP="${XPATH_ELEMENTS[j++]:-$DEDUP}"
+COMPRESSION="${XPATH_ELEMENTS[j++]:-$COMPRESSION}"
+NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
+NAME="${XPATH_ELEMENTS[j++]}"
+SIZE="${XPATH_ELEMENTS[j++]}"
+CLONING_ID="${XPATH_ELEMENTS[j++]}"
 
 # Get source image properties
 XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
-unset i XPATH_ELEMENTS
+unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
 done < <(oneimage show -x $CLONING_ID| $XPATH \
                     /IMAGE/DATASTORE_ID)
 
-SRC_DSID=${XPATH_ELEMENTS[0]}
+SRC_DSID=${XPATH_ELEMENTS[j++]}
 
 # Get source datastore properties
 XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
-unset i XPATH_ELEMENTS
+unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
 done < <(onedatastore show -x $SRC_DSID | $XPATH /DATASTORE/TEMPLATE/NAMING_TYPE)
 
-SRC_NAMING_TYPE="${XPATH_ELEMENTS[0]:-$NAMING_TYPE}"
+SRC_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 
 # -------- Clone image ------------
 
