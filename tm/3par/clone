@@ -98,6 +98,7 @@ done < <(onedatastore show -x $SYS_DSID| $XPATH \
                     /DATASTORE/TEMPLATE/DEDUP \
                     /DATASTORE/TEMPLATE/COMPRESSION \
                     /DATASTORE/TEMPLATE/NAMING_TYPE \
+                    /DATASTORE/TEMPLATE/PORTALS \
                     /DATASTORE/TEMPLATE/QOS_ENABLE \
                     /DATASTORE/TEMPLATE/QOS_PRIORITY \
                     /DATASTORE/TEMPLATE/QOS_MAX_IOPS \
@@ -111,6 +112,7 @@ THIN="${XPATH_ELEMENTS[j++]:-$THIN}"
 DEDUP="${XPATH_ELEMENTS[j++]:-$DEDUP}"
 COMPRESSION="${XPATH_ELEMENTS[j++]:-$COMPRESSION}"
 NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
+PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
 QOS_ENABLE="${XPATH_ELEMENTS[j++]:-$QOS_ENABLE}"
 QOS_PRIORITY="${XPATH_ELEMENTS[j++]:-$QOS_PRIORITY}"
 QOS_MAX_IOPS="${XPATH_ELEMENTS[j++]:-$QOS_MAX_IOPS}"
@@ -122,6 +124,11 @@ QOS_LATENCY="${XPATH_ELEMENTS[j++]:-$QOS_LATENCY}"
 #-------------------------------------------------------------------------------
 # Start actions
 #-------------------------------------------------------------------------------
+
+if [ $? -ne 0 ]; then
+  error_message "$DST_HOST_3PAR"
+  exit 1
+fi
 
 NEW_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVmClone -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
                                 -p $PASSWORD -nt $NAMING_TYPE -tpvv $THIN -tdvv $DEDUP -compr $COMPRESSION -sn $NAME \
@@ -155,6 +162,24 @@ if [ "$QOS_ENABLE" == "YES" ]; then
       exit 1
     fi
 fi
+
+DST_HOST_ISCSI_NAME=$($SSH $DST_HOST sudo cat /etc/iscsi/initiatorname.iscsi | awk -F= '{print $2}')
+DST_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py setupHost -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+  -hs $DST_HOST -in $DST_HOST_ISCSI_NAME)
+
+if [ $? -ne 0 ]; then
+  error_message "$DST_HOST_3PAR"
+  exit 1
+fi
+
+ssh_exec_and_log "$DST_HOST" "
+for PORTAL in $PORTALS; do
+    if ! sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -q \"\$PORTAL[:,]\"; then
+        sudo iscsiadm -m discovery -t sendtargets -p \"\$PORTAL\"
+        sudo iscsiadm -m node -l all -p \"\$PORTAL\"
+    fi
+done
+"
 
 log "Mapping $NEW_NAME_WWN to $DST_HOST"
 

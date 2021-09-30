@@ -44,7 +44,7 @@ commonParser.add_argument('-i', '--ip', help='3PAR IP for SSH authentication opt
                           required=True)
 commonParser.add_argument('-u', '--username', help='3PAR username', required=True)
 commonParser.add_argument('-p', '--password', help='3PAR password', required=True)
-commonParser.add_argument('-sd', '--softDelete', help='Soft-delete volumes/snapshots', type=boolarg, default=True)
+commonParser.add_argument('-sd', '--softDelete', help='Soft-delete volumes/snapshots', type=boolarg, default=False)
 
 # MonitorCPG task parser
 monitorCPGParser = subparsers.add_parser('monitorCPG', parents=[commonParser], help='Get CPG Available Space')
@@ -211,6 +211,17 @@ flattenSnapshotParser.add_argument('-si', '--snapId', help='ID of snapshot', req
 hostExistsParser = subparsers.add_parser('hostExists', parents=[commonParser],
                                          help='Check if host with this name is registered')
 hostExistsParser.add_argument('-hs', '--host', help='Name of host', required=True)
+
+# DeleteHost task parser
+deleteHostParser = subparsers.add_parser('deleteHost', parents=[commonParser],
+                                         help='Delete host')
+deleteHostParser.add_argument('-hs', '--host', help='Name of host', required=True)
+
+# SetupHost task parser
+setupHostParser = subparsers.add_parser('setupHost', parents=[commonParser],
+                                   help='Create and configure host')
+setupHostParser.add_argument('-hs', '--host', help='Name of host', required=True)
+setupHostParser.add_argument('-in', '--iscsiNames', help='Comma separated iSCSI IQN names for the host', required=False, default='')
 
 # AddVolumeToVVSet task parser
 addVolumeToVVSetParser = subparsers.add_parser('addVolumeToVVSet', parents=[commonParser],
@@ -382,7 +393,12 @@ def unexportVV(cl, args):
 
     # check if VLUN exists
     found = False
-    vluns = cl.getHostVLUNs(host)
+    try:
+        vluns = cl.getHostVLUNs(host)
+    except exceptions.HTTPNotFound:
+        print('No VLUNs for host found, exiting...')
+        return
+
     for vlun in vluns:
         if vlun.get('volumeName') == name:
             found = True
@@ -391,7 +407,11 @@ def unexportVV(cl, args):
     if found == False:
         return
 
-    cl.deleteVLUN(name, vlun.get('lun'), host)
+    try:
+        cl.deleteVLUN(name, vlun.get('lun'), host)
+    except exceptions.HTTPNotFound:
+        print('Volume export does not exits, exiting...')
+        return
 
 def createVmClone(cl, args):
     destName = createVmCloneName(args.namingType, args.id, args.vmId)
@@ -620,6 +640,33 @@ def hostExists(cl, args):
         return
     print(1)
 
+def deleteHost(cl, args):
+    cl.deleteHost(args.host)
+
+def setupHost(cl, args):
+    iscsiNames = prepareIscsiNames(args)
+    try:
+        host = cl.getHost(args.host)
+    except exceptions.HTTPNotFound:
+        cl.createHost(args.host, iscsiNames=iscsiNames)
+    else:
+        if len(iscsiNames) != 0:
+            addHostIscsiNames(host, iscsiNames)
+
+def addHostIscsiNames(host, iscsiNames):
+    newIscsiNames = []
+    for iscsiName in iscsiNames:
+        nameExists = False
+        for iscsiPath in host['iSCSIPaths']:
+            if iscsiPath['name'] == iscsiName:
+                nameExists = True
+                break
+        if nameExists:
+            continue
+        newIscsiNames.append(iscsiName)
+    if len(newIscsiNames) != 0:
+        cl.modifyHost(args.host, mod_request={'pathOperation': 1, 'iSCSINames': newIscsiNames})
+
 def addVolumeToVVSet(cl, args):
     vvsetName = '{namingType}.one.vm.{vmId}.vvset'.format(namingType=args.namingType, vmId=args.vmId)
 
@@ -815,6 +862,14 @@ def prepareQosRules(args):
         qosRules['priority'] = 3
 
     return qosRules
+
+def prepareIscsiNames(args):
+    if args.iscsiNames == "":
+        return []
+    else:
+        return args.iscsiNames.split(',')
+
+
 
 # -------------------------------------
 # Parse args and proceed with execution

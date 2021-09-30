@@ -45,6 +45,7 @@ function rescan_scsi_bus {
   local LUN
   local FORCE
   LUN="$1"
+  echo "$SUDO iscsiadm -m session --rescan"
   # important to ignore rev, otherwise rescan failed when 3PAR OS get major update and device is online resized
   # https://gitlab.feldhost.cz/feldhost-public/one-addon-3par/-/issues/1
   [ "$2" == "force" ] && FORCE=" --forcerescan  --ignore-rev"
@@ -95,17 +96,18 @@ function discover_lun {
             exit 1
         fi
 
-        DM_HOLDER=\$($SUDO $DMSETUP ls -o blkdevname | grep -Po "(?<=3$WWN\s\()[^)]+")
-        DM_SLAVE=\$(ls /sys/block/\${DM_HOLDER}/slaves)
-        # Wait a bit for mapping's paths
-        COUNTER=1
-        while [ ! "\${DM_SLAVE}" ] && [ \$COUNTER -le 10 ]; do
-            sleep 1
-            COUNTER=\$((\$COUNTER + 1))
-        done
-        # Exit with error if mapping has no path
-        if [ ! "\${DM_SLAVE}" ]; then
-            exit 1
+        if DM_HOLDER=\$($SUDO $DMSETUP ls -o blkdevname | grep -Po "(?<=3$WWN\s\()[^)]+"); then
+            DM_SLAVE=\$(ls /sys/block/\${DM_HOLDER}/slaves)
+            # Wait a bit for mapping's paths
+            COUNTER=1
+            while [ ! "\${DM_SLAVE}" ] && [ \$COUNTER -le 10 ]; do
+                sleep 1
+                COUNTER=\$((\$COUNTER + 1))
+            done
+            # Exit with error if mapping has no path
+            if [ ! "\${DM_SLAVE}" ]; then
+                exit 1
+            fi
         fi
 EOF
 }
@@ -115,18 +117,19 @@ function remove_lun {
     WWN="$1"
     cat <<EOF
       DEV="/dev/mapper/3$WWN"
-      DM_HOLDER=\$($SUDO $DMSETUP ls -o blkdevname | grep -Po "(?<=3$WWN\s\()[^)]+")
-      DM_SLAVE=\$(ls /sys/block/\${DM_HOLDER}/slaves)
+      if DM_HOLDER=\$($SUDO $DMSETUP ls -o blkdevname | grep -Po "(?<=3$WWN\s\()[^)]+"); then
+          DM_SLAVE=\$(ls /sys/block/\${DM_HOLDER}/slaves)
 
-      $(multipath_flush "\$DEV")
+          $(multipath_flush "\$DEV")
 
-      unset device
-      for device in \${DM_SLAVE}
-      do
-          if [ -e /dev/\${device} ]; then
-              $SUDO $BLOCKDEV --flushbufs /dev/\${device}
-              echo 1 | $SUDO $TEE /sys/block/\${device}/device/delete
-          fi
-      done
+          unset device
+          for device in \${DM_SLAVE}
+          do
+              if [ -e /dev/\${device} ]; then
+                  $SUDO $BLOCKDEV --flushbufs /dev/\${device}
+                  echo 1 | $SUDO $TEE /sys/block/\${device}/device/delete
+              fi
+          done
+      fi
 EOF
 }
