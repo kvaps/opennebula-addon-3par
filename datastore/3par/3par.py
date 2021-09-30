@@ -217,11 +217,11 @@ deleteHostParser = subparsers.add_parser('deleteHost', parents=[commonParser],
                                          help='Delete host')
 deleteHostParser.add_argument('-hs', '--host', help='Name of host', required=True)
 
-# CreateHost task parser
-createHostParser = subparsers.add_parser('createHost', parents=[commonParser],
-                                         help='Create host')
-createHostParser.add_argument('-hs', '--host', help='Name of host', required=True)
-createHostParser.add_argument('-in', '--iscsiNames', help='Comma separated iSCSI IQN names for the host', required=False, default='')
+# SetupHost task parser
+setupHostParser = subparsers.add_parser('setupHost', parents=[commonParser],
+                                   help='Create and configure host')
+setupHostParser.add_argument('-hs', '--host', help='Name of host', required=True)
+setupHostParser.add_argument('-in', '--iscsiNames', help='Comma separated iSCSI IQN names for the host', required=False, default='')
 
 # AddVolumeToVVSet task parser
 addVolumeToVVSetParser = subparsers.add_parser('addVolumeToVVSet', parents=[commonParser],
@@ -643,7 +643,7 @@ def hostExists(cl, args):
 def deleteHost(cl, args):
     cl.deleteHost(args.host)
 
-def createHost(cl, args):
+def setupHost(cl, args):
     iscsiNames = prepareIscsiNames(args)
     try:
         host = cl.getHost(args.host)

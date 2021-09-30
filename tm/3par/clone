@@ -164,7 +164,7 @@ if [ "$QOS_ENABLE" == "YES" ]; then
 fi
 
 DST_HOST_ISCSI_NAME=$($SSH $DST_HOST sudo cat /etc/iscsi/initiatorname.iscsi | awk -F= '{print $2}')
-DST_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py createHost -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+DST_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py setupHost -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
   -hs $DST_HOST -in $DST_HOST_ISCSI_NAME)
 
 if [ $? -ne 0 ]; then
