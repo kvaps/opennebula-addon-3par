@@ -227,7 +227,8 @@ setupHostParser.add_argument('-in', '--iscsiNames', help='Comma separated iSCSI 
 # getPortals task parser
 getIscsiPortalsParser = subparsers.add_parser('getIscsiPortals', parents=[commonParser],
                                    help='Get list of iSCSI portals')
-getIscsiPortalsParser.add_argument('-sr', '--sort', help='Sort the portals by hierarchy and usage count', required=False, default=False)
+getIscsiPortalsParser.add_argument('-sr', '--sort', help='Sort the portals by hierarchy and usage count', required=False,
+                                                  type=boolarg, default=False)
 
 # AddVolumeToVVSet task parser
 addVolumeToVVSetParser = subparsers.add_parser('addVolumeToVVSet', parents=[commonParser],
