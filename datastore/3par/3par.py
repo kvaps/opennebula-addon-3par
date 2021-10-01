@@ -19,6 +19,7 @@
 from hpe3parclient import client, exceptions
 import argparse
 import time
+from more_itertools import roundrobin
 
 # ----------------------------
 # Define parser and subparsers
@@ -222,6 +223,11 @@ setupHostParser = subparsers.add_parser('setupHost', parents=[commonParser],
                                    help='Create and configure host')
 setupHostParser.add_argument('-hs', '--host', help='Name of host', required=True)
 setupHostParser.add_argument('-in', '--iscsiNames', help='Comma separated iSCSI IQN names for the host', required=False, default='')
+
+# getPortals task parser
+getIscsiPortalsParser = subparsers.add_parser('getIscsiPortals', parents=[commonParser],
+                                   help='Get list of iSCSI portals')
+getIscsiPortalsParser.add_argument('-sr', '--sort', help='Sort the portals by hierarchy and usage count', required=False, default=False)
 
 # AddVolumeToVVSet task parser
 addVolumeToVVSetParser = subparsers.add_parser('addVolumeToVVSet', parents=[commonParser],
@@ -667,6 +673,52 @@ def addHostIscsiNames(host, iscsiNames):
     if len(newIscsiNames) != 0:
         cl.modifyHost(args.host, mod_request={'pathOperation': 1, 'iSCSINames': newIscsiNames})
 
+def getIscsiPortals(cl, args):
+    ports = cl.getPorts()
+    portInfo = {}
+
+    # Create map of ports
+    for port in ports['members']:
+        if port['type'] == 8: # showport -iscsivlans
+            portName = createPortName(port['portPos'])
+            portInfo[portName] = {'count': 0, 'ip': port['IPAddr']}
+
+    # If no sorting required, just return list of portals
+    if not args.sort:
+        print(' '.join([portInfo[port]['ip'] for port in portInfo.keys()]))
+        return
+
+    # Otherwise take the hosts map and count usage of each port
+    hosts = cl.getHosts()
+    for host in hosts['members']:
+        for iscsiPath in host['iSCSIPaths']:
+            portName = createPortName(iscsiPath['portPos'])
+            if portName in portInfo:
+                portInfo[portName]['count'] += 1
+
+    # Sort ports by usage count
+    sortedPorts = [port for port in sorted(portInfo, key=lambda x: portInfo[x]['count'])]
+
+    # Make tree of ports hierarchy: node --> slot --> ports
+    # eg: {'1': {'2': ['1:2:1', '1:2:2']}, '0': {'2': ['0:2:1', '0:2:2']}}
+    nodes = {}
+    for port in sortedPorts:
+        a = port.split(':')
+        node = a[0]
+        slot = a[1]
+        if not node in nodes:
+            nodes[node] = {}
+        if not slot in nodes[node]:
+            nodes[node][slot] = [port]
+        else:
+            nodes[node][slot].append(port)
+
+    # Flatten the tree using roundrobin and make list of IPs
+    bestPorts = list(roundrobin(*[ list(roundrobin(*slot.values())) for slot in list(nodes.values()) ]))
+    bestPortals = [portInfo[port]['ip'] for port in bestPorts]
+    print(' '.join(bestPortals))
+    return
+
 def addVolumeToVVSet(cl, args):
     vvsetName = '{namingType}.one.vm.{vmId}.vvset'.format(namingType=args.namingType, vmId=args.vmId)
 
@@ -758,6 +810,9 @@ def deleteQosPolicy(cl, args):
 # ----------------
 # Helper functions
 # ----------------
+def createPortName(portPos):
+    return '{node}:{slot}:{cardPort}'.format(node=portPos['node'], slot=portPos['slot'], cardPort=portPos['cardPort'])
+
 def createVVName(namingType, id):
     return '{namingType}.one.{id}.vv'.format(namingType=namingType, id=id)
 
