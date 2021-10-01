@@ -19,7 +19,7 @@
 from hpe3parclient import client, exceptions
 import argparse
 import time
-from more_itertools import roundrobin
+from itertools import zip_longest
 
 # ----------------------------
 # Define parser and subparsers
@@ -713,8 +713,8 @@ def getIscsiPortals(cl, args):
         else:
             nodes[node][slot].append(port)
 
-    # Flatten the tree using roundrobin and make list of IPs
-    bestPorts = list(roundrobin(*[ list(roundrobin(*slot.values())) for slot in list(nodes.values()) ]))
+    # Flatten the tree using zip_longest and make list of IPs
+    bestPorts = [item for sublist in zip_longest(*[[ item for sublist in zip_longest(*slot.values()) for item in sublist if item ] for slot in nodes.values()]) for item in sublist if item]
     bestPortals = [portInfo[port]['ip'] for port in bestPorts]
     print(' '.join(bestPortals))
     return
