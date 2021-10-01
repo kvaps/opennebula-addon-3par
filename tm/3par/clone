@@ -121,6 +121,15 @@ QOS_MAX_BW="${XPATH_ELEMENTS[j++]:-$QOS_MAX_BW}"
 QOS_MIN_BW="${XPATH_ELEMENTS[j++]:-$QOS_MIN_BW}"
 QOS_LATENCY="${XPATH_ELEMENTS[j++]:-$QOS_LATENCY}"
 
+if [ -z $PORTALS ]; then
+    PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD --sort YES)
+    if [ $? -ne 0 ]; then
+        error_message "$PORTALS"
+        exit 1
+    fi
+fi
+
 #-------------------------------------------------------------------------------
 # Start actions
 #-------------------------------------------------------------------------------

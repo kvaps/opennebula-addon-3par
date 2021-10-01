@@ -150,6 +150,15 @@ done < <(onedatastore show -x $SYS_DSID | $XPATH /DATASTORE/TEMPLATE/NAMING_TYPE
 NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
 
+if [ -z $PORTALS ]; then
+    PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD --sort YES)
+    if [ $? -ne 0 ]; then
+        error_message "$PORTALS"
+        exit 1
+    fi
+fi
+
 # Disk os clone, so copy was created
 if [ "$CLONE" = "YES" ]; then
   # get VM disk WWN

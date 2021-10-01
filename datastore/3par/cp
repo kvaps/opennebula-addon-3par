@@ -106,6 +106,15 @@ if [ -z "$DST_HOST" ]; then
     exit -1
 fi
 
+if [ -z $PORTALS ]; then
+    PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD --sort YES)
+    if [ $? -ne 0 ]; then
+        error_message "$PORTALS"
+        exit 1
+    fi
+fi
+
 set_up_datastore "$BASE_PATH" "$RESTRICTED_DIRS" "$SAFE_DIRS"
 
 IMAGE_HASH=`generate_image_hash`
