@@ -99,6 +99,7 @@ done < <(onedatastore show -x $SYS_DSID| $XPATH \
                     /DATASTORE/TEMPLATE/COMPRESSION \
                     /DATASTORE/TEMPLATE/NAMING_TYPE \
                     /DATASTORE/TEMPLATE/PORTALS \
+                    /DATASTORE/TEMPLATE/PORTALS_NUM \
                     /DATASTORE/TEMPLATE/QOS_ENABLE \
                     /DATASTORE/TEMPLATE/QOS_PRIORITY \
                     /DATASTORE/TEMPLATE/QOS_MAX_IOPS \
@@ -113,6 +114,7 @@ DEDUP="${XPATH_ELEMENTS[j++]:-$DEDUP}"
 COMPRESSION="${XPATH_ELEMENTS[j++]:-$COMPRESSION}"
 NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
+PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
 QOS_ENABLE="${XPATH_ELEMENTS[j++]:-$QOS_ENABLE}"
 QOS_PRIORITY="${XPATH_ELEMENTS[j++]:-$QOS_PRIORITY}"
 QOS_MAX_IOPS="${XPATH_ELEMENTS[j++]:-$QOS_MAX_IOPS}"
@@ -123,7 +125,7 @@ QOS_LATENCY="${XPATH_ELEMENTS[j++]:-$QOS_LATENCY}"
 
 if [ -z $PORTALS ]; then
     PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
-                                                                -p $PASSWORD --sort YES)
+                                                                -p $PASSWORD ${PORTALS_NUM:+--sort YES})
     if [ $? -ne 0 ]; then
         error_message "$PORTALS"
         exit 1
@@ -182,7 +184,7 @@ if [ $? -ne 0 ]; then
 fi
 
 ssh_exec_and_log "$DST_HOST" "
-for PORTAL in $PORTALS; do
+for PORTAL in $(echo $PORTALS | cut -d\  -f-${PORTALS_NUM:-999}); do
     if ! sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -q \"\$PORTAL[:,]\"; then
         sudo iscsiadm -m discovery -t sendtargets -p \"\$PORTAL\"
         sudo iscsiadm -m node -l all -p \"\$PORTAL\"

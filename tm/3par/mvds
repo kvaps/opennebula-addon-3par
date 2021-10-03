@@ -124,7 +124,9 @@ ${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $API_ENDPOINT -i $IP -
 if [ $? -eq 0 ]; then
     ssh_exec_and_log "$SRC_HOST" "
     for PORTAL in $PORTALS; do
-        sudo iscsiadm --mode node -u -p \"\$PORTAL\" || true
+        if sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -q \"\$PORTAL[:,]\"; then
+            sudo iscsiadm --mode node -u -p \"\$PORTAL\"
+        fi
     done
     "
 fi

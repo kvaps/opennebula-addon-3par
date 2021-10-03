@@ -145,14 +145,16 @@ unset i j XPATH_ELEMENTS
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
 done < <(onedatastore show -x $SYS_DSID | $XPATH /DATASTORE/TEMPLATE/NAMING_TYPE \
-                                                 /DATASTORE/TEMPLATE/PORTALS)
+                                                 /DATASTORE/TEMPLATE/PORTALS \
+                                                 /DATASTORE/TEMPLATE/PORTALS_NUM)
 
 NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
+PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
 
 if [ -z $PORTALS ]; then
     PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
-                                                                -p $PASSWORD --sort YES)
+                                                                -p $PASSWORD ${PORTALS_NUM:+--sort YES})
     if [ $? -ne 0 ]; then
         error_message "$PORTALS"
         exit 1
@@ -235,7 +237,9 @@ EOF
         if [ $? -eq 0 ]; then
             ssh_exec_and_log "$SRC_HOST" "
             for PORTAL in $PORTALS; do
-                sudo iscsiadm --mode node -u -p \"\$PORTAL\" || true
+                if sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -q \"\$PORTAL[:,]\"; then
+                    sudo iscsiadm --mode node -u -p \"\$PORTAL\"
+                fi
             done
             "
         fi
@@ -256,7 +260,7 @@ if [ $? -ne 0 ]; then
 fi
 
 ssh_exec_and_log "$DST_HOST" "
-for PORTAL in $PORTALS; do
+for PORTAL in $(echo $PORTALS | cut -d\  -f-${PORTALS_NUM:-999}); do
     if ! sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -q \"\$PORTAL[:,]\"; then
         sudo iscsiadm -m discovery -t sendtargets -p \"\$PORTAL\"
         sudo iscsiadm -m node -l all -p \"\$PORTAL\"
