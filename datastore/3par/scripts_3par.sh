@@ -71,11 +71,13 @@ function iscsi_login {
     PORTALS="$1"
     PORTALS_NUM="$2"
     cat <<EOF
-        CONNECTIONS_NUM=\$(sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -c '\(${PORTALS// /\\|}\)[:,]')
+        CONNECTIONS=\$(sudo iscsiadm -m session -o show | awk '{gsub(",", " ")}; \$3 ~ "(${PORTALS// /|})(:|$)" {print \$3}')
+        CONNECTIONS_NUM=\$(echo "\$CONNECTIONS" | wc -l)
 
+        set -e
         for PORTAL in $PORTALS; do
             [ -n "$PORTALS_NUM" ] && [ "\$CONNECTIONS_NUM" -lt "$PORTALS_NUM" ] || break
-            if ! sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -q "\$PORTAL[:,]"; then
+            if ! echo "\$CONNECTIONS" | grep -q "\$PORTAL[:,]"; then
                 sudo iscsiadm -m discovery -t sendtargets -p "\$PORTAL"
                 sudo iscsiadm -m node -l all -p "\$PORTAL"
                 CONNECTIONS_NUM=\$((CONNECTIONS_NUM+1))
@@ -88,9 +90,9 @@ function iscsi_logout {
     local PORTALS
     PORTALS="$1"
     cat <<EOF
-        for PORTAL in $PORTALS; do
-            if sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -q "\$PORTAL[:,]"; then
-                sudo iscsiadm --mode node -u -p \"\$PORTAL\"
+        sudo iscsiadm -m session -o show | while read _ _ PORTAL _; do
+            if [[ "\$PORTAL" =~ (${PORTALS// /|})(:|$) ]]; then
+                sudo iscsiadm --mode node -u -p "\$PORTAL"
             fi
         done
 EOF
