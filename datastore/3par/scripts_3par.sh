@@ -65,6 +65,37 @@ function get_vv_wwn {
   echo "$NAME_WWN" | $AWK -F: '{print $2}'
 }
 
+function iscsi_login {
+    local PORTALS
+    local PORTALS_NUM
+    PORTALS="$1"
+    PORTALS_NUM="$2"
+    cat <<EOF
+        CONNECTIONS_NUM=\$(sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -c '\(${PORTALS// /\\|}\)[:,]')
+
+        for PORTAL in $PORTALS; do
+            [ -n "$PORTALS_NUM" ] && [ "\$CONNECTIONS_NUM" -lt "$PORTALS_NUM" ] || break
+            if ! sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -q "\$PORTAL[:,]"; then
+                sudo iscsiadm -m discovery -t sendtargets -p "\$PORTAL"
+                sudo iscsiadm -m node -l all -p "\$PORTAL"
+                CONNECTIONS_NUM=\$((CONNECTIONS_NUM+1))
+            fi
+        done
+EOF
+}
+
+function iscsi_logout {
+    local PORTALS
+    PORTALS="$1"
+    cat <<EOF
+        for PORTAL in $PORTALS; do
+            if sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -q "\$PORTAL[:,]"; then
+                sudo iscsiadm --mode node -u -p \"\$PORTAL\"
+            fi
+        done
+EOF
+}
+
 function discover_lun {
     local LUN
     local WWN

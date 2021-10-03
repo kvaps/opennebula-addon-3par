@@ -170,14 +170,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-ssh_exec_and_log "$DST_HOST" "
-for PORTAL in $(echo $PORTALS | cut -d\  -f-${PORTALS_NUM:-999}); do
-    if ! sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -q \"\$PORTAL[:,]\"; then
-        sudo iscsiadm -m discovery -t sendtargets -p \"\$PORTAL\"
-        sudo iscsiadm -m node -l all -p \"\$PORTAL\"
-    fi
-done
-"
+ssh_exec_and_log "$DST_HOST" "$(iscsi_login "$PORTALS" "$PORTALS_NUM")"
 
 # Map image
 log "Mapping $WWN to $DST_HOST"
@@ -241,20 +234,13 @@ EOF
 ssh_exec_and_log "$DST_HOST" "$FLUSH_CMD" \
     "Error flushing out mapping"
 
-# TODO: make trap
 ${DRIVER_PATH}/3par.py unexportVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD -n $NAME -hs $DST_HOST
 
 ${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
                                                         -hs $DST_HOST >/dev/null
 
 if [ $? -eq 0 ]; then
-    ssh_exec_and_log "$DST_HOST" "
-    for PORTAL in $PORTALS; do
-        if sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -q \"\$PORTAL[:,]\"; then
-            sudo iscsiadm --mode node -u -p \"\$PORTAL\"
-        fi
-    done
-    "
+    ssh_exec_and_log "$DST_HOST" "$(iscsi_logout "$PORTALS")"
 fi
 
 echo $NAME_WWN

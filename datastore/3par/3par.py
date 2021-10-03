@@ -692,7 +692,11 @@ def getIscsiPortals(cl, args):
     # Otherwise take the hosts map and count usage of each port
     hosts = cl.getHosts()
     for host in hosts['members']:
+        if not 'iSCSIPaths' in host:
+            continue
         for iscsiPath in host['iSCSIPaths']:
+            if not 'portPos' in iscsiPath:
+                continue
             portName = createPortName(iscsiPath['portPos'])
             if portName in portInfo:
                 portInfo[portName]['count'] += 1

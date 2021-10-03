@@ -183,14 +183,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-ssh_exec_and_log "$DST_HOST" "
-for PORTAL in $(echo $PORTALS | cut -d\  -f-${PORTALS_NUM:-999}); do
-    if ! sudo iscsiadm -m session -o show | awk '{print \$3}' | grep -q \"\$PORTAL[:,]\"; then
-        sudo iscsiadm -m discovery -t sendtargets -p \"\$PORTAL\"
-        sudo iscsiadm -m node -l all -p \"\$PORTAL\"
-    fi
-done
-"
+ssh_exec_and_log "$DST_HOST" "$(iscsi_login "$PORTALS" "$PORTALS_NUM")"
 
 log "Mapping $NEW_NAME_WWN to $DST_HOST"
 
