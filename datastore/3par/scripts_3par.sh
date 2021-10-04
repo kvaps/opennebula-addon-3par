@@ -72,7 +72,11 @@ function iscsi_login {
     PORTALS_NUM="$2"
     cat <<EOF
         CONNECTIONS=\$(sudo iscsiadm -m session -o show | awk '{gsub(",", " ")}; \$3 ~ "(${PORTALS// /|})(:|$)" {print \$3}')
-        CONNECTIONS_NUM=\$(echo "\$CONNECTIONS" | wc -l)
+        if [ -n "\$CONNECTIONS" ]; then
+            CONNECTIONS_NUM=\$(echo "\$CONNECTIONS" | wc -l)
+        else
+            CONNECTIONS_NUM=0
+        fi
 
         set -e
         for PORTAL in $PORTALS; do
