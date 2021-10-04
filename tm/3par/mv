@@ -100,7 +100,6 @@ if [ `is_disk $DST_PATH` -eq 0 ]; then
     TAR_SSH=$(cat <<EOF
     set -e -o pipefail
     
-    # TODO: ssh agent
     $TAR -C $SRC_DS_DIR --sparse -cf - $SRC_VM_DIR | $SSH $DST_HOST '$TAR -C $DST_DIR --sparse -xf -'
     rm -rf $SRC_PATH
 EOF
