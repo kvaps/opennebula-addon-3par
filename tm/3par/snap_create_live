@@ -85,12 +85,10 @@ done < <(onedatastore show -x $SYS_DSID | $XPATH /DATASTORE/TEMPLATE/NAMING_TYPE
 
 NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 
-LIBVIRT_URI="${QEMU_PROTOCOL}://${SRC_HOST}/system"
-
-if virsh -c $LIBVIRT_URI domfsfreeze $DEPLOY_ID ; then
-    trap "virsh -c $LIBVIRT_URI domfsthaw $DEPLOY_ID" EXIT TERM INT HUP
-elif virsh -c $LIBVIRT_URI suspend $DEPLOY_ID; then
-    trap "virsh -c $LIBVIRT_URI resume $DEPLOY_ID" EXIT TERM INT HUP
+if ssh_exec_and_log_no_error "$SRC_HOST" "virsh -c $LIBVIRT_URI domfsfreeze $DEPLOY_ID" >/dev/null 2>&1; then
+    trap "ssh_exec_and_log_no_error '$SRC_HOST' 'virsh -c $LIBVIRT_URI domfsthaw $DEPLOY_ID'" EXIT TERM INT HUP
+elif ssh_exec_and_log_no_error "$SRC_HOST" "virsh -c $LIBVIRT_URI suspend $DEPLOY_ID"; then
+    trap "ssh_exec_and_log_no_error '$SRC_HOST' 'virsh -c $LIBVIRT_URI resume $DEPLOY_ID'" EXIT TERM INT HUP
 else
     error_message "Could not domfsfreeze or suspend domain"
     exit 1
