@@ -19,7 +19,6 @@
 from hpe3parclient import client, exceptions
 import argparse
 import time
-from itertools import zip_longest
 
 # ----------------------------
 # Define parser and subparsers
@@ -317,7 +316,8 @@ def monitorCPG(cl, args):
           else:
             source = disk.get('SOURCE').split(':')
             name = source[0]
-          diskResult.append('DISK_SIZE=[ID={diskId},SIZE={diskSize}]'.format(diskId=disk.get('DISK_ID'), diskSize=diskSizes[name]))
+          if name in diskSizes:
+            diskResult.append('DISK_SIZE=[ID={diskId},SIZE={diskSize}]'.format(diskId=disk.get('DISK_ID'), diskSize=diskSizes[name]))
        
         print(result + ' '.join(diskResult) + '"]')
 
@@ -690,6 +690,7 @@ def getIscsiPortals(cl, args):
         return
 
     # Otherwise take the hosts map and count usage of each port
+    from itertools import zip_longest
     hosts = cl.getHosts()
     for host in hosts['members']:
         if not 'iSCSIPaths' in host:
