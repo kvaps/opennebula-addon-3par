@@ -47,7 +47,7 @@ XPATH="${DRIVER_PATH}/../xpath.rb -b $DRV_ACTION"
 unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
-    XPATH_ELEMENTS[j++]="$element"
+    XPATH_ELEMENTS[i++]="$element"
 done < <($XPATH     /DS_DRIVER_ACTION_DATA/IMAGE/TARGET_SNAPSHOT \
                     /DS_DRIVER_ACTION_DATA/IMAGE/SOURCE)
 
