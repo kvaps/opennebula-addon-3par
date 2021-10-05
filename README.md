@@ -172,6 +172,14 @@ DS_MAD_CONF = [
 ]
 ```
 
+* Edit `/etc/one/oned.conf` and update VM_MAD arguments for 3par
+
+```
+VM_MAD = [
+      ARGUMENTS = "-t 15 -r 0 kvm -l save=save-3par,restore=restore-3par,snapshotcreate=snapshot_create-3par,snapshotdelete=snapshot_delete-3par,snapshotrevert=snapshot_revert-3par",
+      ...
+```
+
 * Enable live disk snapshots support for 3PAR by adding `kvm-3par` to `LIVE_DISK_SNAPSHOTS` variable in `/etc/one/vmm_exec/vmm_execrc`
 ```
 LIVE_DISK_SNAPSHOTS="kvm-qcow2 kvm-ceph kvm-3par"
