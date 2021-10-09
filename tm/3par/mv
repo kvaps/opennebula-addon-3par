@@ -156,7 +156,7 @@ NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
 PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
 
-if [ -z $PORTALS ]; then
+if [ -z "$PORTALS" ]; then
     PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
                                                                 -p $PASSWORD ${PORTALS_NUM:+--sort YES})
     if [ $? -ne 0 ]; then
