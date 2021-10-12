@@ -74,70 +74,17 @@ fi
 
 LCM_STATE=`lcm_state`
 
-if [ `is_disk $DST_PATH` -eq 0 ]; then
-    # for PROLOG_RESUME + PROLOG_UNDEPLOY we got nothing to do
-    if [[ "$LCM_STATE" =~ ^(9|31|49|50)$ ]]; then
-        exit 0
-    fi
-    # for EPILOG_STOP + EPILOG_UNDEPLOY we got nothing to do
-    if [[ "$LCM_STATE" =~ ^(10|30|41|42)$ ]]; then
-        exit 0
-    fi
-
-    # VM is in unknown state, SRC_HOST probably in failed state
-    if [ $LCM_STATE -eq 60 ] || [ $LCM_STATE -eq 61 ]; then
-      log "Not moving files from $SRC_HOST in FT mode"
-      exit 0
-    fi
-
-    ssh_make_path "$DST_HOST" "$DST_DIR"
-
-    log "Moving $SRC to $DST"
-    
-    ssh_exec_and_log "$DST_HOST" "rm -rf '$DST_PATH'" \
-        "Error removing target path to prevent overwrite errors"
-    
-    TAR_SSH=$(cat <<EOF
-    set -e -o pipefail
-    
-    $TAR -C $SRC_DS_DIR --sparse -cf - $SRC_VM_DIR | $SSH $DST_HOST '$TAR -C $DST_DIR --sparse -xf -'
-    rm -rf $SRC_PATH
-EOF
-)
-    
-    ssh_forward ssh_exec_and_log "$SRC_HOST" "$TAR_SSH" "Error copying disk directory to target host"
-    
-    exit 0
-fi
-
-#-------------------------------------------------------------------------------
-# Get image information
-#-------------------------------------------------------------------------------
-
-DISK_ID=$(echo "$DST_PATH" | $AWK -F. '{print $NF}')
-
-XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
-
-unset i j XPATH_ELEMENTS
-
-while IFS= read -r -d '' element; do
-    XPATH_ELEMENTS[i++]="$element"
-done < <(onevm show -x $VMID| $XPATH \
-                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/SOURCE \
-                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/IMAGE_ID \
-                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/CLONE \
-                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/PERSISTENT \
-                    /VM/HISTORY_RECORDS/HISTORY[last\(\)]/DS_ID)
-
-NAME_WWN="${XPATH_ELEMENTS[j++]}"
-IMAGE_ID="${XPATH_ELEMENTS[j++]}"
-CLONE="${XPATH_ELEMENTS[j++]}"
-PERSISTENT="${XPATH_ELEMENTS[j++]}"
-SYS_DSID="${XPATH_ELEMENTS[j++]}"
-
 #-------------------------------------------------------------------------------
 # Get system ds information
 #-------------------------------------------------------------------------------
+
+if [ `is_disk $DST_PATH` -eq 0 ]; then
+  SYS_DSID=$(echo $DST_PATH | $AWK -F '/' '{print $(NF-1)}')
+else
+  SYS_DSID=$(echo $DST_PATH | $AWK -F '/' '{print $(NF-2)}')
+fi
+
+XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
 
 unset i j XPATH_ELEMENTS
 
@@ -165,6 +112,138 @@ if [ -z "$PORTALS" ]; then
     fi
 fi
 
+
+#-------------------------------------------------------------------------------
+# Start actions for directory transfer
+#-------------------------------------------------------------------------------
+
+if [ `is_disk $DST_PATH` -eq 0 ]; then
+    # VM is in unknown state, SRC_HOST probably in failed state
+    if [[ "$LCM_STATE" =~ ^(60|61)$ ]]; then
+      log "Not moving files from $SRC_HOST in FT mode"
+      exit 0
+    fi
+
+    # get VM checkpoint WWN, if any
+    NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+                                                                  -p $PASSWORD -nt $NAMING_TYPE -vi $VMID -id checkpoint)
+    
+    if [ $? -ne 0 ]; then
+      # for SUSPENDED it must exist otherwise exit with no error
+      if [[ "$LCM_STATE" =~ ^(45|46)$ ]]; then
+        error_message "$NAME_WWN"
+      else
+        exit 0
+      fi
+    fi
+
+    NAME=$(get_vv_name "$NAME_WWN")
+    WWN=$(get_vv_wwn "$NAME_WWN")
+
+    # if not PROLOG_RESUME + PROLOG_UNDEPLOY, do detach
+    if ! [[ "$LCM_STATE" =~ ^(9|31|49|50)$ ]]; then
+        LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+          -n $NAME -hs $SRC_HOST)
+
+        if [ $? -ne 0 ]; then
+          error_message "$LUN"
+          exit 1
+        fi
+
+        FLUSH_CMD=$(cat <<EOF
+          set -e
+          $(remove_lun "$WWN")
+EOF
+)
+
+        ssh_exec_and_log "$SRC_HOST" "$FLUSH_CMD" \
+            "Error flushing out mapping"
+
+        ${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+            -hs $SRC_HOST >/dev/null
+    
+        if [ $? -eq 0 ]; then
+            ssh_exec_and_log "$SRC_HOST" "$(iscsi_logout "$PORTALS")"
+        fi
+    fi
+
+    # if not EPILOG_STOP + EPILOG_UNDEPLOY, do attach
+    if ! [[ "$LCM_STATE" =~ ^(10|30|41|42)$ ]]; then
+
+        ssh_exec_and_log "$DST_HOST" "$(iscsi_login "$PORTALS" "$PORTALS_NUM")"
+
+        LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py exportVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                                                    -n $NAME -hs $DST_HOST)
+        if [ $? -ne 0 ]; then
+          error_message "$LUN"
+          exit 1
+        fi
+
+        DISCOVER_CMD=$(cat <<EOF
+            set -e
+            mkdir -p "$DST_DIR"
+            $(discover_lun "$LUN" "$WWN")
+            ln -sf "\$DEV" "$DST_PATH/checkpoint"
+EOF
+)
+        
+        ssh_exec_and_log "$DST_HOST" "$DISCOVER_CMD" \
+            "Error registering $NAME_WWN to $DST_HOST"
+    fi
+
+
+    # for EPILOG_STOP + EPILOG_UNDEPLOY, delete source path and exit
+    if [[ "$LCM_STATE" =~ ^(10|30|41|42)$ ]]; then
+        ssh_exec_and_log "$SRC_HOST" "rm -rf '$SRC_PATH'" \
+            "Error removing target path to prevent overwrite errors"
+        exit 0
+    fi
+
+    ssh_make_path "$DST_HOST" "$DST_DIR"
+
+    # for PROLOG_RESUME + PROLOG_UNDEPLOY, we have nothing to do
+    if [[ "$LCM_STATE" =~ ^(9|31|49|50)$ ]]; then
+        exit 0
+    fi
+
+    log "Moving $SRC to $DST"
+
+    TAR_SSH=$(cat <<EOF
+    set -e -o pipefail
+    
+    $TAR -C $SRC_DS_DIR --sparse -cf - $SRC_VM_DIR | $SSH $DST_HOST '$TAR -C $DST_DIR --sparse -xf -'
+    rm -rf $SRC_PATH
+EOF
+)
+
+    ssh_forward ssh_exec_and_log "$SRC_HOST" "$TAR_SSH" "Error copying disk directory to target host"
+    
+    exit 0
+fi
+
+#-------------------------------------------------------------------------------
+# Get image information
+#-------------------------------------------------------------------------------
+
+DISK_ID=$(echo "$DST_PATH" | $AWK -F. '{print $NF}')
+
+XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
+
+unset i j XPATH_ELEMENTS
+
+while IFS= read -r -d '' element; do
+    XPATH_ELEMENTS[i++]="$element"
+done < <(onevm show -x $VMID| $XPATH \
+                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/SOURCE \
+                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/IMAGE_ID \
+                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/CLONE \
+                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/PERSISTENT)
+
+NAME_WWN="${XPATH_ELEMENTS[j++]}"
+IMAGE_ID="${XPATH_ELEMENTS[j++]}"
+CLONE="${XPATH_ELEMENTS[j++]}"
+PERSISTENT="${XPATH_ELEMENTS[j++]}"
+
 # Disk os clone or volatile, so copy was created
 if [ "$CLONE" = "YES" ] || [ -z "$NAME_WWN" ]; then
   # get VM disk WWN
@@ -181,7 +260,7 @@ NAME=$(get_vv_name "$NAME_WWN")
 WWN=$(get_vv_wwn "$NAME_WWN")
 
 #-------------------------------------------------------------------------------
-# Start actions
+# Start actions for disk transfer
 #-------------------------------------------------------------------------------
 
 SRC_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py hostExists -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
