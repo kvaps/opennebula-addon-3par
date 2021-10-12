@@ -1,0 +1,179 @@
+#!/bin/bash
+
+# -------------------------------------------------------------------------- #
+# Copyright 2002-2019, OpenNebula Project, OpenNebula Systems                #
+#                                                                            #
+# Licensed under the Apache License, Version 2.0 (the "License"); you may    #
+# not use this file except in compliance with the License. You may obtain    #
+# a copy of the License at                                                   #
+#                                                                            #
+# http://www.apache.org/licenses/LICENSE-2.0                                 #
+#                                                                            #
+# Unless required by applicable law or agreed to in writing, software        #
+# distributed under the License is distributed on an "AS IS" BASIS,          #
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.   #
+# See the License for the specific language governing permissions and        #
+# limitations under the License.                                             #
+#--------------------------------------------------------------------------- #
+
+DRIVER_PATH=$(dirname $0)
+
+SRC=$1
+HOST=$2
+
+DEPLOY_ID=$3
+VMID=$4
+
+TEMPLATE_64=$(cat)
+
+if [ -z "${ONE_LOCATION}" ]; then
+    TMCOMMON=/var/lib/one/remotes/tm/tm_common.sh
+    DATASTORES=/var/lib/one/datastores
+else
+    TMCOMMON=$ONE_LOCATION/var/remotes/tm/tm_common.sh
+    DATASTORES=$ONE_LOCATION/var/datastores
+fi
+
+DRIVER_PATH=$(dirname $0)
+
+source $TMCOMMON
+source ${DRIVER_PATH}/../../etc/vmm/kvm/kvmrc
+source ${DRIVER_PATH}/../../etc/datastore/3par/3par.conf
+. ${DRIVER_PATH}/../../datastore/3par/scripts_3par.sh
+
+
+SRC_PATH=`arg_path $SRC`
+SRC_DIR=`dirname $SRC_PATH`
+SRC_XML=${SRC_PATH}.xml
+
+#-------------------------------------------------------------------------------
+# Get system ds information
+#-------------------------------------------------------------------------------
+
+XPATH="${DRIVER_PATH}/../../datastore/xpath.rb -b $TEMPLATE_64"
+
+unset i j XPATH_ELEMENTS
+
+while IFS= read -r -d '' element; do
+    XPATH_ELEMENTS[i++]="$element"
+done < <($XPATH     /VMM_DRIVER_ACTION_DATA/DATASTORE/ID \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TM_MAD \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/API_ENDPOINT \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/IP \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/NAMING_TYPE)
+
+DSID="${XPATH_ELEMENTS[j++]}"
+TM_MAD="${XPATH_ELEMENTS[j++]}"
+API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
+IP="${XPATH_ELEMENTS[j++]:-$IP}"
+NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
+
+# get VM disk WWN
+NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+                                                            -p $PASSWORD -nt $NAMING_TYPE -vi $VMID -id checkpoint)
+
+if [ $? -ne 0 ]; then
+  error_message "$NAME_WWN"
+  exit 1
+fi
+
+NAME=$(get_vv_name "$NAME_WWN")
+WWN=$(get_vv_wwn "$NAME_WWN")
+
+#-------------------------------------------------------------------------------
+# TM_MAD is not 'linstor_un'
+#-------------------------------------------------------------------------------
+
+if [ "$TM_MAD" != "3par" ]; then
+    echo "$DRV_ACTION" | $SSH "$HOST" /var/tmp/one/vmm/kvm/restore "$@"
+    exit $?
+fi
+
+#-------------------------------------------------------------------------------
+# Start actions
+#-------------------------------------------------------------------------------
+
+RECALCULATE_CMD=$(cat <<EOF
+set -e -o pipefail
+
+# extract the xml from the checkpoint
+
+virsh --connect $LIBVIRT_URI save-image-dumpxml $SRC_PATH > $SRC_XML
+
+# Eeplace all occurrences of the DS_LOCATION/<DSID>/<VMID> with the specific
+# DS_ID where the checkpoint is placed. This is done in case there was a
+# system DS migration
+
+sed -i "s%$DS_LOCATION/[0-9]\+/$VMID/%$DS_LOCATION/$DSID/$VMID/%g" $SRC_XML
+sed -i "s%$DS_LOCATION_NON_DOUBLE_SLASH/[0-9]\+/$VMID/%$DS_LOCATION/$DSID/$VMID/%g" $SRC_XML
+EOF
+)
+
+ssh_exec_and_log "$HOST" "$RECALCULATE_CMD" \
+    "Could not recalculate paths in $SRC_XML on $HOST"
+
+### Restore with retry
+
+# On RHEL/CentOS 7 with qemu-kvm (1.5), it may happen the QEMU
+# segfaults on the very first try to restore from checkpoint.
+# We retry 3 times before failing completely.
+
+function restore_domain {
+    ssh_exec_and_log "$HOST" \
+        "virsh --connect $LIBVIRT_URI restore $SRC_PATH --xml $SRC_XML" \
+        "Could not restore from $SRC_PATH on $HOST"
+}
+
+retry 3 restore_domain
+
+if [ $? -ne 0 ]; then
+    exit 1
+fi
+
+set -x
+
+ssh_exec_and_log "$HOST" \
+    "virsh --connect $LIBVIRT_URI resume $DEPLOY_ID" \
+    "Could not resume $DEPLOY_ID on $HOST"
+
+FLUSH_CMD=$(cat <<EOF
+    set -e
+    $(remove_lun "$WWN")
+EOF
+)
+
+log "Unmapping $NAME_WWN from $HOST"
+
+ssh_exec_and_log "$HOST" "$FLUSH_CMD" \
+    "Error flushing out mapping"
+
+${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                                      -n $NAME -hs $HOST
+
+if [ $? -ne 0 ]; then
+  error_message "Error unexporting VV"
+  exit 1
+fi
+
+if [ "$QOS_ENABLE" == "YES" ]; then
+  log "Delete QoS Policy"
+  QOS=$(${DRIVER_PATH}/../../datastore/3par/3par.py deleteQosPolicy -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                    -nt $NAMING_TYPE -n $NAME -vi $VMID)
+
+  if [ $? -ne 0 ]; then
+    error_message "$QOS"
+    exit 1
+  fi
+fi
+
+log "Remove disk from VM VV Set"
+VVSET=$(${DRIVER_PATH}/../../datastore/3par/3par.py deleteVolumeFromVVSet -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                    -nt $NAMING_TYPE -n $NAME -vi $VMID)
+
+if [ $? -ne 0 ]; then
+  error_message "$VVSET"
+  exit 1
+fi
+
+${DRIVER_PATH}/../../datastore/3par/3par.py deleteVmClone -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                                            -nt $NAMING_TYPE -vi $VMID -id checkpoint

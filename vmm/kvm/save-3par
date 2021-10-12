@@ -1,0 +1,184 @@
+#!/bin/bash
+
+# -------------------------------------------------------------------------- #
+# Copyright 2019, FeldHost™ (feldhost.net)                                   #
+#                                                                            #
+# Portions copyright OpenNebula Project (OpenNebula.org), CG12 Labs          #
+#                                                                            #
+# Licensed under the Apache License, Version 2.0 (the "License"); you may    #
+# not use this file except in compliance with the License. You may obtain    #
+# a copy of the License at                                                   #
+#                                                                            #
+# http://www.apache.org/licenses/LICENSE-2.0                                 #
+#                                                                            #
+# Unless required by applicable law or agreed to in writing, software        #
+# distributed under the License is distributed on an "AS IS" BASIS,          #
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.   #
+# See the License for the specific language governing permissions and        #
+# limitations under the License.                                             #
+# -------------------------------------------------------------------------- #
+
+DRIVER_PATH=$(dirname $0)
+
+DEPLOY_ID=$1
+DST=$2
+
+HOST=$3
+VMID=$4
+
+TEMPLATE_64=$(cat)
+
+if [ -z "${ONE_LOCATION}" ]; then
+    TMCOMMON=/var/lib/one/remotes/tm/tm_common.sh
+    DATASTORES=/var/lib/one/datastores
+else
+    TMCOMMON=$ONE_LOCATION/var/remotes/tm/tm_common.sh
+    DATASTORES=$ONE_LOCATION/var/datastores
+fi
+
+DRIVER_PATH=$(dirname $0)
+
+source $TMCOMMON
+source ${DRIVER_PATH}/../../etc/vmm/kvm/kvmrc
+source ${DRIVER_PATH}/../../etc/datastore/3par/3par.conf
+. ${DRIVER_PATH}/../../datastore/3par/scripts_3par.sh
+
+DST_PATH=`arg_path $DST`
+DST_DIR=`dirname $DST_PATH`
+
+#-------------------------------------------------------------------------------
+# Get system ds information
+#-------------------------------------------------------------------------------
+
+XPATH="${DRIVER_PATH}/../../datastore/xpath.rb -b $TEMPLATE_64"
+
+unset i j XPATH_ELEMENTS
+
+while IFS= read -r -d '' element; do
+    XPATH_ELEMENTS[i++]="$element"
+done < <($XPATH     /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/TM_MAD \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/API_ENDPOINT \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/IP \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/CPG \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/THIN \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/DEDUP \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/COMPRESSION \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/NAMING_TYPE \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/QOS_ENABLE \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/QOS_PRIORITY \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/QOS_MAX_IOPS \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/QOS_MIN_IOPS \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/QOS_MAX_BW \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/QOS_MIN_BW \
+                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/QOS_LATENCY)
+
+TM_MAD="${XPATH_ELEMENTS[j++]}"
+API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
+IP="${XPATH_ELEMENTS[j++]:-$IP}"
+CPG="${XPATH_ELEMENTS[j++]:-$CPG}"
+THIN="${XPATH_ELEMENTS[j++]:-$THIN}"
+DEDUP="${XPATH_ELEMENTS[j++]:-$DEDUP}"
+COMPRESSION="${XPATH_ELEMENTS[j++]:-$COMPRESSION}"
+NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
+QOS_ENABLE="${XPATH_ELEMENTS[j++]:-$QOS_ENABLE}"
+QOS_PRIORITY="${XPATH_ELEMENTS[j++]:-$QOS_PRIORITY}"
+QOS_MAX_IOPS="${XPATH_ELEMENTS[j++]:-$QOS_MAX_IOPS}"
+QOS_MIN_IOPS="${XPATH_ELEMENTS[j++]:-$QOS_MIN_IOPS}"
+QOS_MAX_BW="${XPATH_ELEMENTS[j++]:-$QOS_MAX_BW}"
+QOS_MIN_BW="${XPATH_ELEMENTS[j++]:-$QOS_MIN_BW}"
+QOS_LATENCY="${XPATH_ELEMENTS[j++]:-$QOS_LATENCY}"
+
+#-------------------------------------------------------------------------------
+# TM_MAD is not '3par'
+#-------------------------------------------------------------------------------P
+if [ "$TM_MAD" != "3par" ]; then
+    echo "$DRV_ACTION" | $SSH "$HOST" /var/tmp/one/vmm/kvm/save "$@"
+    exit $?
+fi
+
+#-------------------------------------------------------------------------------
+# Start actions
+#-------------------------------------------------------------------------------
+
+# Suspend VM
+ssh_exec_and_log "$HOST" \
+    "virsh --connect $LIBVIRT_URI suspend $DEPLOY_ID" \
+    "Could not suspend $DEPLOY_ID on $HOST"
+
+SIZE_K="$($SSH $HOST virsh --connect $LIBVIRT_URI dommemstat $DEPLOY_ID | \
+    $AWK '$1 == "rss" {print $2}')"
+
+if [ -z "$SIZE_K" ]; then
+    error_message "Error getting checkpoint size"
+    ssh_exec_and_log_no_error "$HOST" \
+        "virsh --connect $LIBVIRT_URI resume $DEPLOY_ID" \
+        "Could not resume $DEPLOY_ID on $HOST"
+    exit -1
+fi
+if [ "$SIZE_K" -lt 4 ]; then
+    SIZE_K="4"
+fi
+
+SIZE=$((SIZE_K/1024))
+
+
+NEW_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVmVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+                                -p $PASSWORD -nt $NAMING_TYPE -tpvv $THIN -tdvv $DEDUP -compr $COMPRESSION \
+                                -vi $VMID -id checkpoint -c $CPG -sz $SIZE -co "$VM_NAME")
+
+if [ $? -ne 0 ]; then
+  error_message "$NEW_NAME_WWN"
+  exit 1
+fi
+
+NEW_NAME=$(get_vv_name "$NEW_NAME_WWN")
+NEW_WWN=$(get_vv_wwn "$NEW_NAME_WWN")
+
+log "Add disk to VM VV Set"
+VVSET=$(${DRIVER_PATH}/../../datastore/3par/3par.py addVolumeToVVSet -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                    -nt $NAMING_TYPE -n $NEW_NAME -vi $VMID -co "$VM_NAME")
+
+if [ $? -ne 0 ]; then
+  error_message "$VVSET"
+  exit 1
+fi
+
+if [ "$QOS_ENABLE" == "YES" ]; then
+    log "Create QoS Policy"
+    QOS=$(${DRIVER_PATH}/../../datastore/3par/3par.py createQosPolicy -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                        -nt $NAMING_TYPE -n $NEW_NAME -vi $VMID -qp $QOS_PRIORITY -qxi $QOS_MAX_IOPS -qmi $QOS_MIN_IOPS \
+                        -qxb $QOS_MAX_BW -qmb $QOS_MIN_BW -ql $QOS_LATENCY)
+
+    if [ $? -ne 0 ]; then
+      error_message "$QOS"
+      exit 1
+    fi
+fi
+
+log "Mapping $NEW_NAME_WWN to $HOST"
+
+LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py exportVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                                            -n $NEW_NAME -hs $HOST)
+
+if [ $? -ne 0 ]; then
+  error_message "$LUN"
+  exit 1
+fi
+
+DISCOVER_CMD=$(cat <<EOF
+    set -e
+    mkdir -p "$DST_DIR"
+    $(discover_lun "$LUN" "$NEW_WWN")
+    ln -sf "\$DEV" "$DST_PATH"
+EOF
+)
+
+ssh_make_path "$HOST" "$DST_DIR"
+
+ssh_exec_and_log "$HOST" "$DISCOVER_CMD" \
+    "Error registering $NEW_NAME_WWN to $HOST"
+
+# saving vm state
+ssh_exec_and_log "$HOST" \
+    "virsh --connect $LIBVIRT_URI save $DEPLOY_ID $DST_PATH" \
+    "could not save $DEPLOY_ID to $DST_PATH on $HOST"
