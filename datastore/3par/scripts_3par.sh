@@ -1,6 +1,7 @@
 #@IgnoreInspection BashAddShebang
 # -------------------------------------------------------------------------- #
 # Copyright 2019, FeldHost™ (feldhost.net)                                   #
+# Copyright 2021, WEDOS Internet a.s. (wedos.com)                            #
 #                                                                            #
 # Portions copyright 2014-2016, Laurent Grawet <dev@grawet.be>               #
 #                                                                            #

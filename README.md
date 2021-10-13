@@ -10,22 +10,21 @@ To contribute bug patches or new features, you can use the GitLab Merge Request 
 
 More info:
 
-* Issues Tracking: GitLab issues (https://gitlab.feldhost.cz/feldhost-public/one-addon-3par/issues)
+* Issues Tracking: GitHub issues (https://github.com/wedos/opennebula-addon-3par/issues)
 
 ## Authors
 
-* Leader: Kristian Feldsam (feldsam@feldhost.net)
+* Original design and implementation: Kristian Feldsam (feldsam@feldhost.net)
+* Rework and new versions adaptation: Andrei Kvapil (kvapss@gmail.com)
 
 ## Support
 
-[FeldHost™](https://www.feldhost.net/products/opennebula) offers design, implementation, operation and management of a cloud solution based on OpenNebula.
+[WEDOS Cloud](https://www.wedos.com/cloud) offers design, implementation, operation and management of a cloud solution based on OpenNebula.
 
 ## Compatibility
 
 This add-on is developed and tested with:
-- OpenNebula 5.6 and 3PAR OS 3.2.2.612 (MU4)+P51,P56,P59,P94,P98,P102,P106,P113,P118,P127  
-- OpenNebula 5.8 and 3PAR OS 3.3.1.410 (MU2)+P32,P34,P36,P37,P39,P40,P41,P42,P45,P48
-- OpenNebula 5.8 and 3PAR OS 3.3.1.460 (MU3)+P50,P58,P61,P77,P78,P81
+- OpenNebula 5.12 and 3PAR OS 3.3.1 (MU5)+P126,P132,P135,P140,P141,P146,P150,P151,P155
 
 ## Requirements
 
@@ -34,13 +33,10 @@ This add-on is developed and tested with:
 * Working OpenNebula CLI interface with `oneadmin` account authorized to OpenNebula's core with UID=0
 * Password-less SSH access from the front-end `oneadmin` user to the `node` instances.
 * 3PAR python package `python-3parclient` installed, WSAPI username, password and access to the 3PAR API network
-* libvirt-client package installed
-* xmlstarlet package installed - used in TM monitor script instead of OpenNebula native ruby script because it is slow
 
 ```bash
-yum install python-setuptools libvirt-client xmlstarlet
-easy_install pip
-pip install python-3parclient
+apt-get install python python3-pip
+pip3 install python-3parclient xmltodict
 ```
 
 ### OpenNebula Node (or Bridge Node)
@@ -53,15 +49,15 @@ pip install python-3parclient
 * `/etc/sudoers.d/opennebula` - add `ONE_3PAR` cmd alias
 
 ```
-nano /etc/sudoers.d/opennebula
-...
+sed -i /etc/multipath.conf -e '/user_friendly_names/ s/yes/no/'
+cat > /etc/sudoers.d/opennebula-3par <<\EOT
 Cmnd_Alias ONE_3PAR = /sbin/multipath, /usr/sbin/multipathd, /sbin/dmsetup, /usr/sbin/blockdev, /usr/bin/tee /sys/block/*/device/delete, /usr/bin/rescan-scsi-bus.sh, /usr/sbin/iscsiadm, /usr/bin/cat /etc/iscsi/initiatorname.iscsi
-oneadmin ALL=(ALL) NOPASSWD: ONE_MISC, ..., ONE_3PAR, ...
-...
+oneadmin ALL=(ALL) NOPASSWD: ONE_3PAR
+EOT
 ```
 
 ```bash
-yum install sg3_utils
+apt-get install open-iscsi multipath-tools
 ```
 
 ## Features
@@ -77,18 +73,21 @@ Support standard OpenNebula datastore operations:
 * live VM snapshots
 * live VM migrations
 * Volatile disks support (need patched KVM driver `attach_disk` script)
-* Sunstone integration - available via our enterprise repository
+* Configuration of API endpoint and auth in datastore template
+* Automatic hosts registration and configuration
+* Option to reduce iSCSI endpoints usage
+* Suspend/unsuspend to 3par volumes
 
 ## Limitations
 
+1. FibreChannel is not currently supported.
 1. Tested only with KVM hypervisor
 1. When SYSTEM datastore is in use the reported free/used/total space is the space on 3PAR CPG. (On the host filesystem there are mostly symlinks and small files that do not require much disk space)
-1. Tested/confirmed working on CentOS 7 (Frontend) and Oracle Linux 7, Oracle Linux 8, CentOS 7, CentOS 8, Fedora 29+ (Nodes).
+1. Tested/confirmed working on Ubuntu 20.04 (Frontend) and Ubuntu 20.04 (Nodes).
 
 ## ToDo
 
 1. QOS Priority per VM
-1. Configuration of API endpoint and auth in datastore template
 
 ## Installation
 
@@ -100,15 +99,7 @@ cd ~
 git clone https://github.com/OpenNebula/addon-3par.git
 ```
 
-### Automated installation
-The automated installation is best suitable for new deployments.
-
-* Run the install script as 'root' user and check for any reported errors or warnings
-```bash
-bash ~/addon-3par/install.sh
-```
-
-### Manual installation
+### Installation
 
 The following commands are related to latest OpenNebula version.
 
@@ -194,12 +185,6 @@ systemtl restart opennebula
 ```bash
 su - oneadmin -c 'onehost sync --force'
 ```
-
-### Live snapshots info
-
-* Live snapshots are tested only by using TCP communication with libvirtd on OpenNebula Nodes. Follow [this docs](https://docs.opennebula.org/5.8/deployment/open_cloud_host_setup/kvm_driver.html?highlight=qemu%20tcp#multiple-actions-per-host)
-* In `/var/lib/one/remotes/etc/vmm/kvm/kvmrc` also set `export QEMU_PROTOCOL=qemu+tcp`
-* Probably works out of the box, because by default `QEMU_PROTOCOL=qemu+ssh`, so it should tries to connect like this `virsh -c qemu+ssh://node/ ...`, but not tested
 
 ### Volatile disks support info
 
