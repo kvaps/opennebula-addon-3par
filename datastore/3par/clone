@@ -34,7 +34,9 @@ fi
 . $LIB_LOCATION/sh/scripts_common.sh
 
 DRIVER_PATH=$(dirname $0)
+source ${DRIVER_PATH}/../libfs.sh
 source ${DRIVER_PATH}/../../etc/datastore/3par/3par.conf
+. ${DRIVER_PATH}/scripts_3par.sh
 
 # -------- Get cp and datastore arguments from OpenNebula core ------------
 
@@ -48,8 +50,11 @@ unset i j XPATH_ELEMENTS
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
 done < <($XPATH     /DS_DRIVER_ACTION_DATA/DATASTORE/ID \
+                    /DS_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/BRIDGE_LIST \
                     /DS_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/API_ENDPOINT \
                     /DS_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/IP \
+                    /DS_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/PORTALS \
+                    /DS_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/PORTALS_NUM \
                     /DS_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/CPG \
                     /DS_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/THIN \
                     /DS_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/DEDUP \
@@ -59,14 +64,17 @@ done < <($XPATH     /DS_DRIVER_ACTION_DATA/DATASTORE/ID \
                     /DS_DRIVER_ACTION_DATA/IMAGE/SIZE \
                     /DS_DRIVER_ACTION_DATA/IMAGE/CLONING_ID)
 
-DSID="${XPATH_ELEMENTS[j++]}"
-API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
-IP="${XPATH_ELEMENTS[j++]:-$IP}"
-CPG="${XPATH_ELEMENTS[j++]:-$CPG}"
-THIN="${XPATH_ELEMENTS[j++]:-$THIN}"
-DEDUP="${XPATH_ELEMENTS[j++]:-$DEDUP}"
-COMPRESSION="${XPATH_ELEMENTS[j++]:-$COMPRESSION}"
-NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
+DST_DSID="${XPATH_ELEMENTS[j++]}"
+BRIDGE_LIST="${XPATH_ELEMENTS[j++]}"
+DST_API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
+DST_IP="${XPATH_ELEMENTS[j++]:-$IP}"
+DST_PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
+DST_PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
+DST_CPG="${XPATH_ELEMENTS[j++]:-$CPG}"
+DST_THIN="${XPATH_ELEMENTS[j++]:-$THIN}"
+DST_DEDUP="${XPATH_ELEMENTS[j++]:-$DEDUP}"
+DST_COMPRESSION="${XPATH_ELEMENTS[j++]:-$COMPRESSION}"
+DST_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 NAME="${XPATH_ELEMENTS[j++]}"
 SIZE="${XPATH_ELEMENTS[j++]}"
 CLONING_ID="${XPATH_ELEMENTS[j++]}"
@@ -78,9 +86,14 @@ unset i j XPATH_ELEMENTS
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
 done < <(oneimage show -x $CLONING_ID| $XPATH \
-                    /IMAGE/DATASTORE_ID)
+                    /IMAGE/DATASTORE_ID \
+                    /IMAGE/SOURCE)
 
 SRC_DSID=${XPATH_ELEMENTS[j++]}
+SRC_NAME_WWN=${XPATH_ELEMENTS[j++]}
+
+SRC_NAME=$(get_vv_name "$SRC_NAME_WWN")
+SRC_WWN=$(get_vv_wwn "$SRC_NAME_WWN")
 
 # Get source datastore properties
 XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
@@ -88,12 +101,182 @@ unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
-done < <(onedatastore show -x $SRC_DSID | $XPATH /DATASTORE/TEMPLATE/NAMING_TYPE)
+done < <(onedatastore show -x $SRC_DSID | $XPATH \
+             /DATASTORE/TEMPLATE/API_ENDPOINT \
+             /DATASTORE/TEMPLATE/IP \
+             /DATASTORE/TEMPLATE/PORTALS \
+             /DATASTORE/TEMPLATE/PORTALS_NUM \
+             /DATASTORE/TEMPLATE/NAMING_TYPE)
 
+SRC_API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
+SRC_IP="${XPATH_ELEMENTS[j++]:-$IP}"
+SRC_PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
+SRC_PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
 SRC_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 
-# -------- Clone image ------------
+# -------- Clone image within single 3par ------------
 
-${DRIVER_PATH}/3par.py cloneVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                                -snt $SRC_NAMING_TYPE -sid $CLONING_ID -nt $NAMING_TYPE -id $ID \
-                                -tpvv $THIN -tdvv $DEDUP -compr $COMPRESSION -c $CPG -sz $SIZE -co "$NAME"
+if [ "$SRC_IP" = "$DST_IP" ]; then
+    ${DRIVER_PATH}/3par.py cloneVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                -snt $SRC_NAMING_TYPE -sid $CLONING_ID -nt $DST_NAMING_TYPE -id $ID \
+                                -tpvv $DST_THIN -tdvv $DST_DEDUP -compr $DST_COMPRESSION -c $DST_CPG -sz $SIZE -co "$NAME"
+    exit $?
+fi
+
+# -------- Clone image between multiple 3pars ------------
+
+DST_HOST=`get_destination_host $ID`
+
+if [ -z "$DST_HOST" ]; then
+    error_message "Datastore template missing 'BRIDGE_LIST' attribute."
+    exit -1
+fi
+
+if [ -z $SRC_PORTALS ]; then
+    SRC_PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD ${SRC_PORTALS_NUM:+--sort YES})
+    if [ $? -ne 0 ]; then
+        error_message "$SRC_PORTALS"
+        exit 1
+    fi
+fi
+
+if [ -z $DST_PORTALS ]; then
+    DST_PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD ${DST_PORTALS_NUM:+--sort YES})
+    if [ $? -ne 0 ]; then
+        error_message "$DST_PORTALS"
+        exit 1
+    fi
+fi
+
+
+# Create image
+DST_NAME_WWN=$(${DRIVER_PATH}/3par.py createVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD -nt $DST_NAMING_TYPE \
+                                            -tpvv $DST_THIN -tdvv $DST_DEDUP -compr $DST_COMPRESSION -id $ID -c $DST_CPG -sz $SIZE -co "$IMAGE_NAME")
+
+if [ $? -ne 0 ]; then
+  error_message "$DST_NAME_WWN"
+  exit 1
+fi
+
+DST_NAME=$(get_vv_name "$DST_NAME_WWN")
+DST_WWN=$(get_vv_wwn "$DST_NAME_WWN")
+
+DST_HOST_ISCSI_NAME=$($SSH $DST_HOST sudo cat /etc/iscsi/initiatorname.iscsi | awk -F= '{print $2}')
+DST_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py setupHost -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+  -hs $DST_HOST -in $DST_HOST_ISCSI_NAME)
+
+if [ $? -ne 0 ]; then
+  error_message "$DST_HOST_3PAR"
+  exit 1
+fi
+
+ssh_exec_and_log "$DST_HOST" "$(iscsi_login "$SRC_PORTALS" "$SRC_PORTALS_NUM")"
+
+
+DST_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py setupHost -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+  -hs $DST_HOST -in $DST_HOST_ISCSI_NAME)
+
+if [ $? -ne 0 ]; then
+  error_message "$DST_HOST_3PAR"
+  exit 1
+fi
+
+ssh_exec_and_log "$DST_HOST" "$(iscsi_login "$DST_PORTALS" "$DST_PORTALS_NUM")"
+
+# Map image
+log "Mapping $SRC_WWN to $DST_HOST"
+
+SRC_LUN=$(${DRIVER_PATH}/3par.py exportVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD -n $SRC_NAME -hs $DST_HOST)
+
+if [ $? -ne 0 ]; then
+  error_message "$SRC_LUN"
+  exit 1
+fi
+
+DISCOVER_CMD=$(cat <<EOF
+    set -e
+    $(discover_lun "$SRC_LUN" "$SRC_WWN")
+    echo "\$DEV"
+EOF
+)
+
+ssh_exec_and_log "$DST_HOST" "$DISCOVER_CMD" \
+    "Error registering $SRC_WWN to $DST_HOST"
+
+
+# Map image
+log "Mapping $DST_WWN to $DST_HOST"
+
+DST_LUN=$(${DRIVER_PATH}/3par.py exportVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD -n $DST_NAME -hs $DST_HOST)
+
+if [ $? -ne 0 ]; then
+  error_message "$DST_LUN"
+  exit 1
+fi
+
+DISCOVER_CMD=$(cat <<EOF
+    set -e
+    $(discover_lun "$DST_LUN" "$DST_WWN")
+    echo "\$DEV"
+EOF
+)
+
+ssh_exec_and_log "$DST_HOST" "$DISCOVER_CMD" \
+    "Error registering $DST_WWN to $DST_HOST"
+
+# copy image
+COPY_CMD=$(cat <<EOF
+    dd \if=/dev/mapper/3$SRC_WWN of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k}
+EOF
+)
+
+ssh_exec_and_log "$DST_HOST" "$COPY_CMD" \
+    "Error copying $SRC_WWN to $DST_WWN in $DST_HOST"
+
+# Unmap image
+log "Unmapping $SRC_WWN from $DST_HOST"
+
+FLUSH_CMD=$(cat <<EOF
+    set -e
+    $(remove_lun "$SRC_WWN")
+EOF
+)
+
+ssh_exec_and_log "$DST_HOST" "$FLUSH_CMD" \
+    "Error flushing out mapping"
+
+
+${DRIVER_PATH}/3par.py unexportVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD -n $SRC_NAME -hs $DST_HOST
+
+${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                                        -hs $DST_HOST >/dev/null
+
+if [ $? -eq 0 ]; then
+    ssh_exec_and_log "$DST_HOST" "$(iscsi_logout "$SRC_PORTALS")"
+fi
+
+# Unmap image
+log "Unmapping $DST_WWN from $DST_HOST"
+
+FLUSH_CMD=$(cat <<EOF
+    set -e
+    $(remove_lun "$DST_WWN")
+EOF
+)
+
+ssh_exec_and_log "$DST_HOST" "$FLUSH_CMD" \
+    "Error flushing out mapping"
+
+
+${DRIVER_PATH}/3par.py unexportVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD -n $DST_NAME -hs $DST_HOST
+
+${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                                        -hs $DST_HOST >/dev/null
+
+if [ $? -eq 0 ]; then
+    ssh_exec_and_log "$DST_HOST" "$(iscsi_logout "$DST_PORTALS")"
+fi
+
+echo "$DST_NAME_WWN"
