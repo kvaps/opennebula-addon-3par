@@ -89,7 +89,7 @@ DST_DSID="${XPATH_ELEMENTS[j++]}"
 # Get system ds information
 #-------------------------------------------------------------------------------
 
-DST_DS_DATA=$(onedatastore show -x $DST_DSID | sed "s|</TEMPLATE>$|<BRIDGE_LIST>$DST_HOST</BRIDGE_LIST></TEMPLATE>|")
+DST_DS_DATA=$(onedatastore show -x $DST_DSID)
 
 unset i j XPATH_ELEMENTS
 
@@ -180,16 +180,19 @@ SRC_QOS_MAX_BW="${XPATH_ELEMENTS[j++]:-$QOS_MAX_BW}"
 SRC_QOS_MIN_BW="${XPATH_ELEMENTS[j++]:-$QOS_MIN_BW}"
 SRC_QOS_LATENCY="${XPATH_ELEMENTS[j++]:-$QOS_LATENCY}"
 
+${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD -n $NAME -t VSIZE >/dev/null
+if [ $? -ne 0 ]; then
+    # -------- Clone image between multiple 3pars ------------
+    IMAGE_ID=$(echo $NAME | cut -d. -f3)
+    IMAGE_DATA=$(oneimage show -x $IMAGE_ID)
+    DATA_64="$(echo "<DS_DRIVER_ACTION_DATA>${DST_DS_DATA}${IMAGE_DATA}</DS_DRIVER_ACTION_DATA>" | base64 -w0)"
 
-if [ "$SRC_IP" != "$DST_IP" ]; then
-    ${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $DST_API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
-                                                                    -p $PASSWORD -n $NAME -t VSIZE >/dev/null
-    if [ $? -ne 0 ]; then
-        IMAGE_ID=$(echo $NAME | cut -d. -f3)
-        IMAGE_DATA=$(oneimage show -x $IMAGE_ID | sed "s|<CLONING_ID>-1</CLONING_ID>|<CLONING_ID>$IMAGE_ID</CLONING_ID>|")
-        DATA_64="$(echo "<DS_DRIVER_ACTION_DATA>${DST_DS_DATA}${IMAGE_DATA}</DS_DRIVER_ACTION_DATA>" | base64 -w0)"
+    DST_HOST="$DST_HOST" \
+    CLONING_ID="$IMAGE_ID" \
+    DST_PORTALS="$DST_PORTALS" \
+    DST_PORTALS_NUM="$DST_PORTALS_NUM" \
         ${DRIVER_PATH}/../../datastore/3par/clone "$DATA_64" $IMAGE_ID
-    fi
 fi
 
 NEW_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVmClone -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
