@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # -------------------------------------------------------------------------- #
 # Copyright 2019, FeldHost™ (feldhost.net)                                   #
 # Copyright 2021, WEDOS Internet a.s. (wedos.com)                            #
@@ -44,8 +43,9 @@ fi
 
 DRIVER_PATH=$(dirname $0)
 
+source ${DRIVER_PATH}/../../datastore/libfs.sh
 source ${DRIVER_PATH}/../../etc/datastore/3par/3par.conf
-. ${DRIVER_PATH}/../../datastore/3par/scripts_3par.sh
+source ${DRIVER_PATH}/../../datastore/3par/scripts_3par.sh
 
 # -------- Get cpds and datastore arguments from OpenNebula core ------------
 
@@ -53,7 +53,14 @@ SRC=$1
 DST=$2
 SNAP_ID=$3
 VMID=$4
-DSID=$5
+DST_DSID=$5
+
+SRC_PATH=`arg_path $SRC`
+SRC_HOST=`arg_host $SRC`
+SRC_DIR=`dirname $SRC_PATH`
+
+DST_NAME=$(get_vv_name "$DST")
+DST_WWN=$(get_vv_wwn "$DST")
 
 #-------------------------------------------------------------------------------
 # Get dest ds information
@@ -65,14 +72,18 @@ unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
-done < <(onedatastore show -x $DSID | $XPATH \
+done < <(onedatastore show -x $DST_DSID | $XPATH \
+                    /DATASTORE/TEMPLATE/BRIDGE_LIST \
+                    /DATASTORE/TEMPLATE/NAMING_TYPE \
                     /DATASTORE/TEMPLATE/API_ENDPOINT \
                     /DATASTORE/TEMPLATE/IP \
                     /DATASTORE/TEMPLATE/CPG)
 
-API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
-IP="${XPATH_ELEMENTS[j++]:-$IP}"
-CPG="${XPATH_ELEMENTS[j++]:-$CPG}"
+BRIDGE_LIST="${XPATH_ELEMENTS[j++]}"
+DST_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
+DST_API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
+DST_IP="${XPATH_ELEMENTS[j++]:-$IP}"
+DST_CPG="${XPATH_ELEMENTS[j++]:-$CPG}"
 
 #-------------------------------------------------------------------------------
 # Get Image information
@@ -85,13 +96,15 @@ unset i j XPATH_ELEMENTS
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
 done < <(onevm show -x $VMID| $XPATH \
+                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/SOURCE \
                     /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/IMAGE_ID \
                     /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/CLONE \
                     /VM/HISTORY_RECORDS/HISTORY[last\(\)]/DS_ID)
 
+SRC_NAME_WWN="${XPATH_ELEMENTS[j++]}"
 IMAGE_ID="${XPATH_ELEMENTS[j++]}"
 CLONE="${XPATH_ELEMENTS[j++]}"
-SYS_DSID="${XPATH_ELEMENTS[j++]}"
+SRC_DSID="${XPATH_ELEMENTS[j++]}"
 
 #-------------------------------------------------------------------------------
 # Get system ds information
@@ -101,18 +114,112 @@ unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
-done < <(onedatastore show -x $SYS_DSID | $XPATH /DATASTORE/TEMPLATE/NAMING_TYPE)
+done < <(onedatastore show -x $SRC_DSID | $XPATH \
+                    /DATASTORE/TEMPLATE/NAMING_TYPE \
+                    /DATASTORE/TEMPLATE/API_ENDPOINT \
+                    /DATASTORE/TEMPLATE/IP \
+                    /DATASTORE/TEMPLATE/CPG)
 
-NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
+SRC_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
+SRC_API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
+SRC_IP="${XPATH_ELEMENTS[j++]:-$IP}"
+SRC_CPG="${XPATH_ELEMENTS[j++]:-$CPG}"
 
-NAME=$(get_vv_name "$DST")
+log "Copy disk id $DISK_ID attached on VM $VMID to new disk $DST_NAME"
 
-log "Copy disk id $DISK_ID attached on VM $VMID to new disk $NAME"
-
-if [ "$CLONE" != "YES" ]; then
-  DISK_ID=$IMAGE_ID
-  CLONE=0
+if [ "$CLONE" = "YES" ] || [ -z "$SRC_NAME_WWN" ]; then
+    SRC_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
+                                                                  -p $PASSWORD -nt $SRC_NAMING_TYPE -vi $VMID -id $DISK_ID)
+    if [ $? -ne 0 ]; then
+      error_message "$SRC_NAME_WWN"
+      exit 1
+    fi
+else
+    DISK_ID=$IMAGE_ID
+    CLONE=0
 fi
 
-${DRIVER_PATH}/../../datastore/3par/3par.py copyVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                                                    -nt $NAMING_TYPE -id $DISK_ID -vi $VMID -d $NAME -c $CPG -vc $CLONE
+SRC_NAME=$(get_vv_name "$SRC_NAME_WWN")
+SRC_WWN=$(get_vv_wwn "$SRC_NAME_WWN")
+
+${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD -n $SRC_NAME -t VSIZE >/dev/null
+if [ $? -eq 0 ]; then
+    # -------- Clone image within single 3par ------------
+    # TODO: add snapshots support
+    ${DRIVER_PATH}/../../datastore/3par/3par.py copyVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                                        -nt $DST_NAMING_TYPE -id $DISK_ID -vi $VMID -d $DST_NAME -c $DST_CPG -vc $CLONE
+    exit $?
+fi
+
+# -------- Clone image between multiple 3pars ------------
+
+DST_HOST=`get_destination_host $IMAGE_ID`
+
+if [ -z "$DST_HOST" ]; then
+    error_message "Datastore template missing 'BRIDGE_LIST' attribute."
+    exit -1
+fi
+
+if [ -z $DST_PORTALS ]; then
+    DST_PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD ${DST_PORTALS_NUM:+--sort YES})
+    if [ $? -ne 0 ]; then
+        error_message "$DST_PORTALS"
+        exit 1
+    fi
+fi
+
+ssh_exec_and_log "$DST_HOST" "$(iscsi_login "$DST_PORTALS" "$DST_PORTALS_NUM")"
+
+# Map image
+log "Mapping $DST_WWN to $DST_HOST"
+
+DST_LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py exportVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD -n $DST_NAME -hs $DST_HOST)
+
+if [ $? -ne 0 ]; then
+  error_message "$DST_LUN"
+  exit 1
+fi
+
+DISCOVER_CMD=$(cat <<EOF
+    set -e
+    $(discover_lun "$DST_LUN" "$DST_WWN")
+    echo "\$DEV"
+EOF
+)
+
+ssh_exec_and_log "$DST_HOST" "$DISCOVER_CMD" \
+    "Error registering $DST_WWN to $DST_HOST"
+
+# copy image
+COPY_CMD=$(cat <<EOF
+    set -e -o pipefail
+    dd \if=/dev/mapper/3$SRC_WWN bs=${DD_BLOCK_SIZE:-64k} | $SSH $DST_HOST 'dd of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}'
+EOF
+)
+
+ssh_forward ssh_exec_and_log "$SRC_HOST" "$COPY_CMD" \
+    "Error copying $SRC_WWN to $DST_WWN in $SRC_HOST"
+
+# Unmap image
+log "Unmapping $DST_WWN from $DST_HOST"
+
+FLUSH_CMD=$(cat <<EOF
+    set -e
+    $(remove_lun "$DST_WWN")
+EOF
+)
+
+ssh_exec_and_log "$DST_HOST" "$FLUSH_CMD" \
+    "Error flushing out mapping"
+
+
+${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD -n $DST_NAME -hs $DST_HOST
+
+${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                                        -hs $DST_HOST >/dev/null
+
+if [ $? -eq 0 ]; then
+    ssh_exec_and_log "$DST_HOST" "$(iscsi_logout "$DST_PORTALS")"
+fi
