@@ -69,7 +69,9 @@ CLONE="${XPATH_ELEMENTS[j++]}"
 SYS_DSID="${XPATH_ELEMENTS[j++]}"
 DEPLOY_ID="${XPATH_ELEMENTS[j++]}"
 
-if [ "$CLONE" != "YES" ]; then
+if [ "$CLONE" = "YES" ]; then
+  DSID=$SYS_DSID
+else
   DISK_ID=$IMAGE_ID
   CLONE=0
 fi
@@ -82,7 +84,7 @@ unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
-done < <(onedatastore show -x $SYS_DSID | $XPATH \
+done < <(onedatastore show -x $DSID | $XPATH \
                    /DATASTORE/TEMPLATE/API_ENDPOINT \
                    /DATASTORE/TEMPLATE/IP \
                    /DATASTORE/TEMPLATE/NAMING_TYPE)
