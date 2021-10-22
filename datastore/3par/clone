@@ -68,8 +68,8 @@ DST_DSID="${XPATH_ELEMENTS[j++]}"
 BRIDGE_LIST="${XPATH_ELEMENTS[j++]}"
 DST_API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
 DST_IP="${XPATH_ELEMENTS[j++]:-$IP}"
-X_DST_PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
-X_DST_PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
+DST_PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
+DST_PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
 DST_CPG="${XPATH_ELEMENTS[j++]:-$CPG}"
 DST_THIN="${XPATH_ELEMENTS[j++]:-$THIN}"
 DST_DEDUP="${XPATH_ELEMENTS[j++]:-$DEDUP}"
@@ -77,21 +77,13 @@ DST_COMPRESSION="${XPATH_ELEMENTS[j++]:-$COMPRESSION}"
 DST_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 NAME="${XPATH_ELEMENTS[j++]}"
 SIZE="${XPATH_ELEMENTS[j++]}"
-X_CLONING_ID="${XPATH_ELEMENTS[j++]}"
+CLONING_ID="${XPATH_ELEMENTS[j++]}"
 
-# DST_PORTALS, DST_PORTALS_NUM and CLONING_ID may be passed by tm script
-DST_PORTALS=${X_DST_PORTALS:-$DST_PORTALS}
-DST_PORTALS_NUM=${X_DST_PORTALS_NUM:-$DST_PORTALS_NUM}
-CLONING_ID=${X_CLONING_ID:-$CLONING_ID}
+DST_HOST=`get_destination_host $ID`
 
-# DST_HOST may be passed by tm script
 if [ -z "$DST_HOST" ]; then
-    DST_HOST=`get_destination_host $ID`
-
-    if [ -z "$DST_HOST" ]; then
-        error_message "Datastore template missing 'BRIDGE_LIST' attribute."
-        exit -1
-    fi
+    error_message "Datastore template missing 'BRIDGE_LIST' attribute."
+    exit -1
 fi
 
 # Get source image properties
@@ -127,20 +119,16 @@ done < <(onedatastore show -x $SRC_DSID | $XPATH \
 BRIDGE_LIST="${XPATH_ELEMENTS[j++]}"
 SRC_API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
 SRC_IP="${XPATH_ELEMENTS[j++]:-$IP}"
-X_SRC_PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
-X_SRC_PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
+SRC_PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
+SRC_PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
 SRC_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
-
-# SRC_PORTALS and SRC_PORTALS_NUM may be passed by tm script
-SRC_PORTALS=${X_SRC_PORTALS:-$SRC_PORTALS}
-SRC_PORTALS_NUM=${X_SRC_PORTALS_NUM:-$SRC_PORTALS_NUM}
 
 # -------- Clone image within single 3par ------------
 
 ${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $DST_API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
                                                                     -p $PASSWORD -n $SRC_NAME -t VSIZE >/dev/null
 
-if [ $? -ne 0 ]; then
+if [ $? -eq 0 ]; then
     ${DRIVER_PATH}/3par.py cloneVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
                                 -snt $SRC_NAMING_TYPE -sid $CLONING_ID -nt $DST_NAMING_TYPE -id $ID \
                                 -tpvv $DST_THIN -tdvv $DST_DEDUP -compr $DST_COMPRESSION -c $DST_CPG -sz $SIZE -co "$NAME"
@@ -149,14 +137,11 @@ fi
 
 # -------- Clone image between multiple 3pars ------------
 
-# SRC_HOST may be passed by tm script
-if [ -z "$SRC_HOST" ]; then
-    SRC_HOST=`get_destination_host $ID`
+SRC_HOST=`get_destination_host $ID`
 
-    if [ -z "$SRC_HOST" ]; then
-        error_message "Datastore template missing 'BRIDGE_LIST' attribute."
-        exit -1
-    fi
+if [ -z "$SRC_HOST" ]; then
+    error_message "Datastore template missing 'BRIDGE_LIST' attribute."
+    exit -1
 fi
 
 if [ -z $SRC_PORTALS ]; then
