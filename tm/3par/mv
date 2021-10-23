@@ -111,6 +111,9 @@ else
     # Disk os clone or volatile, so copy was created
     if [ "$CLONE" = "YES" ] || [ -z "$SRC_NAME_WWN" ]; then
         VOLATILE=YES
+    else
+        SRC_DSID=$DSID
+        DST_DSID=$DSID
     fi
 fi
 
@@ -182,9 +185,6 @@ if [ `is_disk $SRC_PATH` -eq 1 ]; then
           error_message "$SRC_NAME_WWN"
           exit 1
         fi
-    else
-        SRC_DSID=$DSID
-        DST_DSID=$DSID
     fi
     
     SRC_NAME=$(get_vv_name "$SRC_NAME_WWN")
