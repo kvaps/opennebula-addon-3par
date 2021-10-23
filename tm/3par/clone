@@ -343,6 +343,23 @@ fi
 
 ssh_exec_and_log "$SRC_HOST" "$(iscsi_login "$SRC_PORTALS" "$SRC_PORTALS_NUM")"
 
+LOCK_FILE="/var/lock/one/3par-attach-${SRC_HOST}-${SRC_NAME}.lock"
+( umask 0027; touch "${LOCK_FILE}" 2>/dev/null )
+
+# open lockfile
+{ exec {FD}>"${LOCK_FILE}"; } 2>/dev/null
+if [ $? -ne 0 ]; then
+    log_error "Could not create or open lock ${LOCK_FILE}"
+    exit -2
+fi
+
+# acquire lock
+flock -s "${FD}" 2>/dev/null
+if [ $? -ne 0 ]; then
+    log_error "Could not acquire shared lock on ${LOCK_FILE}"
+    exit -2
+fi
+
 # Map image
 log "Mapping $SRC_WWN to $SRC_HOST"
 
@@ -373,24 +390,32 @@ EOF
 ssh_forward ssh_exec_and_log "$SRC_HOST" "$COPY_CMD" \
     "Error copying $SRC_WWN to $DST_WWN in $SRC_HOST"
 
-# Unmap image
-log "Unmapping $SRC_WWN from $SRC_HOST"
+if flock -n "${FD}" 2>/dev/null; then
+    # Unmap image
+    log "Unmapping $SRC_WWN from $SRC_HOST"
 
-FLUSH_CMD=$(cat <<EOF
-    set -e
-    $(remove_lun "$SRC_WWN")
+    FLUSH_CMD=$(cat <<EOF
+        set -e
+        $(remove_lun "$SRC_WWN")
 EOF
 )
 
-ssh_exec_and_log "$SRC_HOST" "$FLUSH_CMD" \
-    "Error flushing out mapping"
+    ssh_exec_and_log "$SRC_HOST" "$FLUSH_CMD" \
+        "Error flushing out mapping"
 
 
-${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD -n $SRC_NAME -hs $SRC_HOST
+    ${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD -n $SRC_NAME -hs $SRC_HOST
 
-${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                                                        -hs $SRC_HOST >/dev/null
+    ${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                                            -hs $SRC_HOST >/dev/null
 
-if [ $? -eq 0 ]; then
-    ssh_exec_and_log "$SRC_HOST" "$(iscsi_logout "$SRC_PORTALS")"
+    if [ $? -eq 0 ]; then
+        ssh_exec_and_log "$SRC_HOST" "$(iscsi_logout "$SRC_PORTALS")"
+    fi
+fi
+
+# release lock
+eval "exec ${FD}>&-"
+if flock -n "${FD}" 2>/dev/null; then
+    rm -f "$LOCK_FILE"
 fi

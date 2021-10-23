@@ -41,9 +41,6 @@ pip3 install python-3parclient xmltodict
 
 ### OpenNebula Node (or Bridge Node)
 
-* There is only one task (`datastore/3par/cp`), which use `BRIDGE_LIST`, so there is no need to have separate Bridge Node
-* Each OpenNebula Node (or Bridge Node) need to have relevant Host created on 3PAR
-* Host name on 3PAR and OpenNebula Node name (or Bridge Node name) must be same. Name is used for (un)exporting volumes
 * sg3_utils package installed
 * `/etc/multipath.conf` need to have set `user_friendly_names no`, because we use WWNs instead of `mpathx` aliasses
 * `/etc/sudoers.d/opennebula` - add `ONE_3PAR` cmd alias
