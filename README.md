@@ -74,6 +74,7 @@ Support standard OpenNebula datastore operations:
 * Automatic hosts registration and configuration
 * Option to reduce iSCSI endpoints usage
 * Suspend/unsuspend to 3par volumes
+* Multiple 3PARs systems support
 
 ## Limitations
 
