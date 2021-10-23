@@ -280,7 +280,8 @@ CLONE="${XPATH_ELEMENTS[j++]}"
 PERSISTENT="${XPATH_ELEMENTS[j++]}"
 
 # Disk os clone or volatile, so copy was created
-if [ "$CLONE" = "YES" ] || [ -z "$NAME_WWN" ]; then
+if [ "$CLONE" = "YES" ] || [ -z "$SRC_NAME_WWN" ]; then
+  VOLATILE=YES
   # get VM disk WWN
   SRC_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $SRC_API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
                                                                 -p $PASSWORD -nt $SRC_NAMING_TYPE -vi $VMID -id $DISK_ID)
@@ -298,17 +299,9 @@ SRC_WWN=$(get_vv_wwn "$SRC_NAME_WWN")
 # Start actions for disk transfer
 #-------------------------------------------------------------------------------
 
-#SRC_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py hostExists -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
-#                                                                        -p $PASSWORD -hs $SRC_HOST)
-#
-#if [ $? -ne 0 ]; then
-#  error_message "$SRC_HOST_3PAR"
-#  exit 1
-#fi
-
 if [ "$SAME_3PAR" = 0 ]; then
     ${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
-                                                                    -p $PASSWORD -n $NAME -t VSIZE >/dev/null
+                                                                    -p $PASSWORD -n $SRC_NAME -t VSIZE >/dev/null
     if [ $? -ne 0 ]; then
         SAME_3PAR=0
     else
@@ -326,13 +319,26 @@ if [ -z "$DST_PORTALS" ]; then
     fi
 fi
 
-if [ "$SAME_3PAR" = 1 ]; then
-    DST_NAME_WWN="$SRC_NAME_WWN"
-    DST_NAME="$SRC_NAME"
-    DST_WWN="$SRC_WWN"
-else
-    echo "Not implemented yet"
-    exit 123
+DST_NAME_WWN="$SRC_NAME_WWN"
+DST_NAME="$SRC_NAME"
+DST_WWN="$SRC_WWN"
+
+# Transfer system ds (only for non-persistent images)
+if [ "$CLONE" = "YES" ] || [ "$VOLATILE" = "YES" ]; then
+    if [ "$SAME_3PAR" = 1 ]; then
+        # If different naming type within same 3par, rename image
+        if [ "$SRC_NAMING_TYPE" != "$DST_NAMING_TYPE" ]; then
+            DST_NAME=$(${DRIVER_PATH}/../../datastore/3par/3par.py mvVmClone -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                    -snt $SRC_NAMING_TYPE -nt $DST_NAMING_TYPE -vi $VMID  -id $DISK_ID)
+            if [ $? -ne 0 ]; then
+                error_message "$DST_NAME"
+                exit 1
+            fi
+        fi
+    else
+        echo "Not implemented yet"
+        exit 123
+    fi
 fi
 
 # ------- Deactivate disk on SRC (skip for PROLOG_RESUME + PROLOG_UNDEPLOY) -----------

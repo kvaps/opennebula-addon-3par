@@ -159,6 +159,16 @@ deleteVmCloneParser.add_argument('-nt', '--namingType', help='Best practices Nam
 deleteVmCloneParser.add_argument('-id', '--id', help='ID of VM disk', required=True)
 deleteVmCloneParser.add_argument('-vi', '--vmId', help='Id of VM', required=True)
 
+# MvVmClone task parser
+mvVmCloneParser = subparsers.add_parser('mvVmClone', parents=[commonParser],
+                                        help='Moves VM Clone VV between naming types')
+mvVmCloneParser.add_argument('-snt', '--srcNamingType', help='Source: Best practices Naming conventions <TYPE> part',
+                             default='dev')
+mvVmCloneParser.add_argument('-nt', '--namingType', help='Destination: Best practices Naming conventions <TYPE> part',
+                             default='dev')
+mvVmCloneParser.add_argument('-id', '--id', help='ID of VM disk', required=True)
+mvVmCloneParser.add_argument('-vi', '--vmId', help='Id of VM', required=True)
+
 # CreateVVSetSnapshot task parser
 createVVSetSnapshotParser = subparsers.add_parser('createVVSetSnapshot', parents=[commonParser], help='Create snapshot of volume set')
 createVVSetSnapshotParser.add_argument('-nt', '--namingType', help='Source: Best practices Naming conventions <TYPE> part',
@@ -479,6 +489,13 @@ def deleteVmClone(cl, args):
     name = createVmCloneName(args.namingType, args.id, args.vmId)
 
     deleteVVWithName(cl, name)
+
+def mvVmClone(cl, args):
+    srcName = createVmCloneName(args.srcNamingType, args.id, args.vmId)
+    dstName = createVmCloneName(args.namingType, args.id, args.vmId)
+
+    cl.modifyVolume(srcName, {'newName': dstName})
+    print('{name}'.format(name=dstName))
 
 
 def createVVSetSnapshot(cl, args):
