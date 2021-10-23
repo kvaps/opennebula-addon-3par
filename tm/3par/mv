@@ -388,6 +388,7 @@ EOF
             COPY_CMD=$(cat <<EOF
                 set -e -o pipefail
                 dd \if=/dev/mapper/3$SRC_WWN bs=${DD_BLOCK_SIZE:-64k} | $SSH $DST_HOST 'dd of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}'
+                sync
 EOF
 )
         
@@ -593,6 +594,7 @@ if [ "$CLONE" = "YES" ] || [ "$VOLATILE" = "YES" ]; then
         COPY_CMD=$(cat <<EOF
             set -e -o pipefail
             dd \if=/dev/mapper/3$SRC_WWN bs=${DD_BLOCK_SIZE:-64k} | $SSH $DST_HOST 'dd of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}'
+            sync
 EOF
 )
     
