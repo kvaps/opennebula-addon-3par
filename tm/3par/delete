@@ -157,15 +157,6 @@ NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
 QOS_ENABLE="${XPATH_ELEMENTS[j++]:-$QOS_ENABLE}"
 
-if [ -z "$PORTALS" ]; then
-    PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
-                                                                -p $PASSWORD)
-    if [ $? -ne 0 ]; then
-        error_message "$PORTALS"
-        exit 1
-    fi
-fi
-
 # if clone or volatile = non-persistent disk, get right name and wwn
 if [ "$CLONE" == "YES" ] || [ "$DISK_TYPE" == "FILE" ]; then
     #-------------------------------------------------------------------------------
@@ -177,10 +168,16 @@ if [ "$CLONE" == "YES" ] || [ "$DISK_TYPE" == "FILE" ]; then
     while IFS= read -r -d '' element; do
         XPATH_ELEMENTS[i++]="$element"
     done < <(onedatastore show -x $SYS_DSID | $XPATH \
+                                /DATASTORE/TEMPLATE/API_ENDPOINT \
+                                /DATASTORE/TEMPLATE/IP \
                                 /DATASTORE/TEMPLATE/NAMING_TYPE \
+                                /DATASTORE/TEMPLATE/PORTALS \
                                 /DATASTORE/TEMPLATE/QOS_ENABLE)
 
+    API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
+    IP="${XPATH_ELEMENTS[j++]:-$IP}"
     NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
+    PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
     QOS_ENABLE="${XPATH_ELEMENTS[j++]:-$QOS_ENABLE}"
 
     # get VM disk WWN
@@ -190,6 +187,15 @@ if [ "$CLONE" == "YES" ] || [ "$DISK_TYPE" == "FILE" ]; then
     if [ $? -ne 0 ]; then
       error_message "$NAME_WWN"
       exit 1
+    fi
+fi
+
+if [ -z "$PORTALS" ]; then
+    PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD)
+    if [ $? -ne 0 ]; then
+        error_message "$PORTALS"
+        exit 1
     fi
 fi
 

@@ -149,7 +149,7 @@ DATASTORE_MAD = [
 * Edit `/etc/one/oned.conf` and append `TM_MAD_CONF` definition for 3par
 ```
 TM_MAD_CONF = [
-  NAME = "3par", LN_TARGET = "NONE", CLONE_TARGET = "SELF", SHARED = "yes", DRIVER = "raw", ALLOW_ORPHANS="yes"
+  NAME = "3par", LN_TARGET = "NONE", CLONE_TARGET = "SYSTEM", SHARED = "yes", DRIVER = "raw", ALLOW_ORPHANS="yes"
 ]
 ```
 
