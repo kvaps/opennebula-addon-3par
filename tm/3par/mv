@@ -52,7 +52,7 @@ SRC=$1
 DST=$2
 
 VMID=$3
-DSID=$4
+DSID=$4 # image ds
 
 SRC=`fix_dir_slashes $SRC`
 DST=`fix_dir_slashes $DST`
@@ -68,7 +68,7 @@ DST_DIR=`dirname $DST_PATH`
 SRC_DS_DIR=`dirname  $SRC_PATH`
 SRC_VM_DIR=`basename $SRC_PATH`
 
-if [ "$SRC" == "$DST" ]; then
+if [ "$SRC" = "$DST" ]; then
     log "Not moving $SRC to $DST, they are the same path"
     exit 0
 fi
@@ -76,13 +76,15 @@ fi
 LCM_STATE=`lcm_state`
 
 #-------------------------------------------------------------------------------
-# Get system ds information
+# Get source ds information
 #-------------------------------------------------------------------------------
 
-if [ `is_disk $DST_PATH` -eq 0 ]; then
-  SYS_DSID=$(echo $DST_PATH | $AWK -F '/' '{print $(NF-1)}')
+if [ `is_disk $SRC_PATH` -eq 0 ]; then
+  SRC_DSID=$(echo $SRC_PATH | $AWK -F '/' '{print $(NF-1)}')
+  DST_DSID=$(echo $DST_PATH | $AWK -F '/' '{print $(NF-1)}')
 else
-  SYS_DSID=$(echo $DST_PATH | $AWK -F '/' '{print $(NF-2)}')
+  SRC_DSID=$(echo $SRC_PATH | $AWK -F '/' '{print $(NF-2)}')
+  DST_DSID=$(echo $DST_PATH | $AWK -F '/' '{print $(NF-2)}')
 fi
 
 XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
@@ -91,28 +93,60 @@ unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
-done < <(onedatastore show -x $SYS_DSID | $XPATH \
+done < <(onedatastore show -x $SRC_DSID | $XPATH \
                     /DATASTORE/TEMPLATE/API_ENDPOINT \
                     /DATASTORE/TEMPLATE/IP \
                     /DATASTORE/TEMPLATE/NAMING_TYPE \
                     /DATASTORE/TEMPLATE/PORTALS \
                     /DATASTORE/TEMPLATE/PORTALS_NUM)
 
-API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
-IP="${XPATH_ELEMENTS[j++]:-$IP}"
-NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
-PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
-PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
+SRC_API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
+SRC_IP="${XPATH_ELEMENTS[j++]:-$IP}"
+SRC_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
+SRC_PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
+SRC_PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
 
-if [ -z "$PORTALS" ]; then
-    PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
-                                                                -p $PASSWORD ${PORTALS_NUM:+--sort YES})
+if [ -z "$SRC_PORTALS" ]; then
+    SRC_PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD ${SRC_PORTALS_NUM:+--sort YES})
     if [ $? -ne 0 ]; then
-        error_message "$PORTALS"
+        error_message "$SRC_PORTALS"
         exit 1
     fi
 fi
 
+#-------------------------------------------------------------------------------
+# Get destination ds information
+#-------------------------------------------------------------------------------
+
+if [ "$DST_DSID" = "$SRC_DSID" ]; then
+    SAME_3PAR=1
+    DST_API_ENDPOINT="$SRC_API_ENDPOINT"
+    DST_IP="$SRC_IP"
+    DST_NAMING_TYPE="$SRC_NAMING_TYPE"
+    DST_PORTALS="$SRC_PORTALS"
+    DST_PORTALS_NUM="$SRC_PORTALS_NUM"
+else
+    XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
+    
+    unset i j XPATH_ELEMENTS
+
+    while IFS= read -r -d '' element; do
+        XPATH_ELEMENTS[i++]="$element"
+    done < <(onedatastore show -x $DST_DSID | $XPATH \
+                        /DATASTORE/TEMPLATE/API_ENDPOINT \
+                        /DATASTORE/TEMPLATE/IP \
+                        /DATASTORE/TEMPLATE/NAMING_TYPE \
+                        /DATASTORE/TEMPLATE/PORTALS \
+                        /DATASTORE/TEMPLATE/PORTALS_NUM)
+    
+    DST_API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
+    DST_IP="${XPATH_ELEMENTS[j++]:-$IP}"
+    DST_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
+    DST_PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
+    DST_PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
+
+fi
 
 #-------------------------------------------------------------------------------
 # Start actions for directory transfer
@@ -226,7 +260,7 @@ fi
 # Get image information
 #-------------------------------------------------------------------------------
 
-DISK_ID=$(echo "$DST_PATH" | $AWK -F. '{print $NF}')
+DISK_ID=$(echo "$SRC_PATH" | $AWK -F. '{print $NF}')
 
 XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
 
@@ -240,7 +274,7 @@ done < <(onevm show -x $VMID| $XPATH \
                     /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/CLONE \
                     /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/PERSISTENT)
 
-NAME_WWN="${XPATH_ELEMENTS[j++]}"
+SRC_NAME_WWN="${XPATH_ELEMENTS[j++]}"
 IMAGE_ID="${XPATH_ELEMENTS[j++]}"
 CLONE="${XPATH_ELEMENTS[j++]}"
 PERSISTENT="${XPATH_ELEMENTS[j++]}"
@@ -248,114 +282,125 @@ PERSISTENT="${XPATH_ELEMENTS[j++]}"
 # Disk os clone or volatile, so copy was created
 if [ "$CLONE" = "YES" ] || [ -z "$NAME_WWN" ]; then
   # get VM disk WWN
-  NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
-                                                                -p $PASSWORD -nt $NAMING_TYPE -vi $VMID -id $DISK_ID)
+  SRC_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $SRC_API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD -nt $SRC_NAMING_TYPE -vi $VMID -id $DISK_ID)
 
   if [ $? -ne 0 ]; then
-    error_message "$NAME_WWN"
+    error_message "$SRC_NAME_WWN"
     exit 1
   fi
 fi
 
-NAME=$(get_vv_name "$NAME_WWN")
-WWN=$(get_vv_wwn "$NAME_WWN")
+SRC_NAME=$(get_vv_name "$SRC_NAME_WWN")
+SRC_WWN=$(get_vv_wwn "$SRC_NAME_WWN")
 
 #-------------------------------------------------------------------------------
 # Start actions for disk transfer
 #-------------------------------------------------------------------------------
 
-SRC_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py hostExists -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
-                                                                        -p $PASSWORD -hs $SRC_HOST)
+#SRC_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py hostExists -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
+#                                                                        -p $PASSWORD -hs $SRC_HOST)
+#
+#if [ $? -ne 0 ]; then
+#  error_message "$SRC_HOST_3PAR"
+#  exit 1
+#fi
 
-if [ $? -ne 0 ]; then
-  error_message "$SRC_HOST_3PAR"
-  exit 1
+if [ "$SAME_3PAR" = 0 ]; then
+    ${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                                                    -p $PASSWORD -n $NAME -t VSIZE >/dev/null
+    if [ $? -ne 0 ]; then
+        SAME_3PAR=0
+    else
+        SAME_3PAR=1
+        DST_PORTALS="$SRC_PORTALS"
+    fi
 fi
 
-
-# Not persistent and not clone, so this disk can be used by more VMs at the same time
-CAN_UNMAP=1
-
-# for PROLOG_RESUME + PROLOG_UNDEPLOY skip deactivate
-if ! [[ "$LCM_STATE" =~ ^(9|31|49|50)$ ]]; then
-    if [ "$PERSISTENT" != "YES" ] && [ "$CLONE" == "NO" ]; then
-        # check if disk is in use by other VMs
-        unset i j XPATH_ELEMENTS
-    
-        while IFS= read -r -d '' element; do
-            XPATH_ELEMENTS[i++]="$element"
-        done < <(oneimage show -x $IMAGE_ID| $XPATH /IMAGE/RUNNING_VMS)
-    
-        RUNNING_VMS="${XPATH_ELEMENTS[j++]}"
-    
-        # image is used, so can't unmap
-        [ "$RUNNING_VMS" != "1" ] && CAN_UNMAP=0
+if [ -z "$DST_PORTALS" ]; then
+    DST_PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD ${DST_PORTALS_NUM:+--sort YES})
+    if [ $? -ne 0 ]; then
+        error_message "$DST_PORTALS"
+        exit 1
     fi
+fi
+
+if [ "$SAME_3PAR" = 1 ]; then
+    DST_NAME_WWN="$SRC_NAME_WWN"
+    DST_NAME="$SRC_NAME"
+    DST_WWN="$SRC_WWN"
+else
+    echo "Not implemented yet"
+    exit 123
+fi
+
+# ------- Deactivate disk on SRC (skip for PROLOG_RESUME + PROLOG_UNDEPLOY) -----------
+
+if ! [[ "$LCM_STATE" =~ ^(9|31|49|50)$ ]]; then
+    log "Unmapping $SRC_WWN from $SRC_HOST"
     
-    if [ "$SRC_HOST_3PAR" == "1" ] && [ "$CAN_UNMAP" == "1" ]; then
-        log "Unmapping $WWN from $SRC_HOST"
-    
-        # src host in failed state, can not flush disk before unexport
-        if [ $LCM_STATE -ne 60 ] && [ $LCM_STATE -ne 61 ]; then
-            FLUSH_CMD=$(cat <<EOF
-              set -e
-              $(remove_lun "$WWN")
+    # src host in failed state, can not flush disk before unexport
+    if [ $LCM_STATE -ne 60 ] && [ $LCM_STATE -ne 61 ]; then
+        FLUSH_CMD=$(cat <<EOF
+          set -e
+          $(remove_lun "$SRC_WWN")
 EOF
 )
     
-            ssh_exec_and_log "$SRC_HOST" "$FLUSH_CMD" \
-                "Error flushing out mapping"
-        fi
+        ssh_exec_and_log "$SRC_HOST" "$FLUSH_CMD" \
+            "Error flushing out mapping"
+    fi
     
-        ${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
-            -n $NAME -hs $SRC_HOST
+    ${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+        -n $SRC_NAME -hs $SRC_HOST
     
-        if [ $? -ne 0 ]; then
-          error_message "Error unexporting VV"
-          exit 1
-        fi
+    if [ $? -ne 0 ]; then
+      error_message "Error unexporting VV"
+      exit 1
+    fi
 
-        ${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
-            -hs $SRC_HOST >/dev/null
+    ${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+        -hs $SRC_HOST >/dev/null
     
-        if [ $? -eq 0 ]; then
-            ssh_exec_and_log "$SRC_HOST" "$(iscsi_logout "$PORTALS")"
-        fi
+    if [ $? -eq 0 ]; then
+        ssh_exec_and_log "$SRC_HOST" "$(iscsi_logout "$SRC_PORTALS")"
     fi
 fi
 
-# for EPILOG_STOP + EPILOG_UNDEPLOY we got nothing to do
+# ------- Activate disk on DST (skip for EPILOG_STOP + EPILOG_UNDEPLOY) -----------
+
 if [[ "$LCM_STATE" =~ ^(10|30|41|42)$ ]]; then
     exit 0
 fi
 
 DST_HOST_ISCSI_NAME=$($SSH $DST_HOST sudo cat /etc/iscsi/initiatorname.iscsi | awk -F= '{print $2}')
-DST_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py setupHost -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
+DST_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py setupHost -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
     -hs $DST_HOST -in $DST_HOST_ISCSI_NAME)
 if [ $? -ne 0 ]; then
     error_message "$DST_HOST_3PAR"
     exit 1
 fi
 
-ssh_exec_and_log "$DST_HOST" "$(iscsi_login "$PORTALS" "$PORTALS_NUM")"
+ssh_exec_and_log "$DST_HOST" "$(iscsi_login "$DST_PORTALS" "$DST_PORTALS_NUM")"
 
-log "Mapping $NAME_WWN to $DST_HOST"
+log "Mapping $DST_NAME_WWN to $DST_HOST"
 
-LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py exportVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                                                            -n $NAME -hs $DST_HOST)
+DST_LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py exportVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                                            -n $DST_NAME -hs $DST_HOST)
 
 if [ $? -ne 0 ]; then
-  error_message "$LUN"
+  error_message "$DST_LUN"
   exit 1
 fi
 
 DISCOVER_CMD=$(cat <<EOF
     set -e
     mkdir -p "$DST_DIR"
-    $(discover_lun "$LUN" "$WWN")
+    $(discover_lun "$DST_LUN" "$DST_WWN")
     ln -sf "\$DEV" "$DST_PATH"
 EOF
 )
 
 ssh_exec_and_log "$DST_HOST" "$DISCOVER_CMD" \
-    "Error registering $NAME_WWN to $DST_HOST"
+    "Error registering $DST_NAME_WWN to $DST_HOST"
