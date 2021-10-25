@@ -146,13 +146,15 @@ ${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $DST_API_ENDPOINT -i $D
                                                                 -p $PASSWORD -n $SRC_NAME -t VSIZE >/dev/null
 if [ $? -eq 0 ]; then
     # -------- Clone image within single 3par ------------
-    # TODO: add snapshots support
     ${DRIVER_PATH}/../../datastore/3par/3par.py copyVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                                                        -nt $DST_NAMING_TYPE -id $DISK_ID -vi $VMID -d $DST_NAME -c $DST_CPG -vc $CLONE
+                                -nt $DST_NAMING_TYPE -id $DISK_ID -si $SNAP_ID -vi $VMID -d $DST_NAME -c $DST_CPG -vc $CLONE
     exit $?
 fi
 
 # -------- Clone image between multiple 3pars ------------
+
+if [ "$SNAP_ID" != -1 ]; then
+fi
 
 DST_HOST=`get_destination_host $IMAGE_ID`
 
