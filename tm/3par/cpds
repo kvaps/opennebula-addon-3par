@@ -142,8 +142,8 @@ fi
 SRC_NAME=$(get_vv_name "$SRC_NAME_WWN")
 SRC_WWN=$(get_vv_wwn "$SRC_NAME_WWN")
 
-${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
-                                                                -p $PASSWORD -n $SRC_NAME -t VSIZE >/dev/null
+${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD -n $SRC_NAME >/dev/null
 if [ $? -eq 0 ]; then
     # -------- Clone image within single 3par ------------
     ${DRIVER_PATH}/../../datastore/3par/3par.py copyVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \

@@ -125,8 +125,8 @@ SRC_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 
 # -------- Clone image within single 3par ------------
 
-${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $DST_API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
-                                                                    -p $PASSWORD -n $SRC_NAME -t VSIZE >/dev/null
+${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $DST_API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+                                                                    -p $PASSWORD -n $SRC_NAME >/dev/null
 
 if [ $? -eq 0 ]; then
     ${DRIVER_PATH}/3par.py cloneVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \

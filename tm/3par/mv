@@ -280,8 +280,8 @@ if [ `is_disk $DST_PATH` -eq 0 ]; then
     if [ -n "$SRC_NAME" ]; then
 
         if [ -z "$SAME_3PAR" ]; then
-            ${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
-                                                                            -p $PASSWORD -n $SRC_NAME -t VSIZE >/dev/null
+            ${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                                                            -p $PASSWORD -n $SRC_NAME >/dev/null
             if [ $? -ne 0 ]; then
                 SAME_3PAR=0
             else
@@ -478,8 +478,8 @@ fi
 #-------------------------------------------------------------------------------
 
 if [ -z "$SAME_3PAR" ]; then
-    ${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
-                                                                    -p $PASSWORD -n $SRC_NAME -t VSIZE >/dev/null
+    ${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                                                    -p $PASSWORD -n $SRC_NAME >/dev/null
     if [ $? -ne 0 ]; then
         SAME_3PAR=0
     else

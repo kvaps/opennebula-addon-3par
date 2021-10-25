@@ -181,8 +181,8 @@ SRC_QOS_MAX_BW="${XPATH_ELEMENTS[j++]:-$QOS_MAX_BW}"
 SRC_QOS_MIN_BW="${XPATH_ELEMENTS[j++]:-$QOS_MIN_BW}"
 SRC_QOS_LATENCY="${XPATH_ELEMENTS[j++]:-$QOS_LATENCY}"
 
-${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
-                                                                -p $PASSWORD -n $NAME -t VSIZE >/dev/null
+${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD -n $NAME >/dev/null
 if [ $? -ne 0 ]; then
     SAME_3PAR=0
 else
