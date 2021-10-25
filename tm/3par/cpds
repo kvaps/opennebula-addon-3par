@@ -153,7 +153,38 @@ fi
 
 # -------- Clone image between multiple 3pars ------------
 
-if [ "$SNAP_ID" != -1 ]; then
+if [ "$CLONE" = "YES" ] && [ "$SNAP_ID" != "-1" ]; then
+    SRC_NAME="$SRC_NAME.$SNAP_ID"
+
+    SRC_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
+                                                                    -p $PASSWORD -n $SRC_NAME)
+
+    if [ $? -ne 0 ]; then
+        error_message "$SRC_NAME_WWN"
+        exit 1
+    fi
+
+    SRC_WWN=$(get_vv_wwn "$SRC_NAME_WWN")
+
+    # Map image
+    log "Mapping $SRC_NAME_WWN to $DST_HOST"
+
+    SRC_LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py exportVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD -n $SRC_NAME -hs $SRC_HOST)
+    if [ $? -ne 0 ]; then
+        error_message "$SRC_LUN"
+        exit 1
+    fi
+
+    DISCOVER_CMD=$(cat <<EOF
+        set -e
+        $(discover_lun "$SRC_LUN" "$SRC_WWN")
+        echo "\$DEV"
+EOF
+)
+
+    ssh_exec_and_log "$SRC_HOST" "$DISCOVER_CMD" \
+        "Error registering $SRC_WWN to $SRC_HOST"
+
 fi
 
 DST_HOST=`get_destination_host $IMAGE_ID`
@@ -175,7 +206,7 @@ fi
 ssh_exec_and_log "$DST_HOST" "$(iscsi_login "$DST_PORTALS" "$DST_PORTALS_NUM")"
 
 # Map image
-log "Mapping $DST_WWN to $DST_HOST"
+log "Mapping $DST_NAME_WWN to $DST_HOST"
 
 DST_LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py exportVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD -n $DST_NAME -hs $DST_HOST)
 
@@ -203,7 +234,23 @@ EOF
 )
 
 ssh_forward ssh_exec_and_log "$SRC_HOST" "$COPY_CMD" \
-    "Error copying $SRC_WWN to $DST_WWN in $SRC_HOST"
+    "Error copying $SRC_NAME_WWN to $DST_WWN in $SRC_HOST"
+
+if [ "$CLONE" = "YES" ] && [ "$SNAP_ID" != "-1" ]; then
+    # Unmap image
+    log "Unmapping $SRC_NAME_WWN from $SRC_HOST"
+
+    FLUSH_CMD=$(cat <<EOF
+        set -e
+        $(remove_lun "$SRC_WWN")
+EOF
+)
+
+    ssh_exec_and_log "$SRC_HOST" "$FLUSH_CMD" \
+        "Error flushing out mapping"
+
+    ${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD -n $SRC_NAME -hs $SRC_HOST
+fi
 
 # Unmap image
 log "Unmapping $DST_WWN from $DST_HOST"

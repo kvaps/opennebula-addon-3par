@@ -66,6 +66,10 @@ createVVParser.add_argument('-compr', '--compression', help='Thin provision comp
 createVVParser.add_argument('-c', '--cpg', help='CPG Name', required=True)
 createVVParser.add_argument('-co', '--comment', help='Comment')
 
+# getVV task parser
+getVVParser = subparsers.add_parser('getVV', parents=[commonParser], help='Get VV name and wwn')
+getVVParser.add_argument('-n', '--name', help='Name of VV', required=True)
+
 # DeleteVV task parser
 deleteVVParser = subparsers.add_parser('deleteVV', parents=[commonParser], help='Delete VV')
 deleteVVParser.add_argument('-nt', '--namingType', help='Best practices Naming conventions <TYPE> part', default='dev')
@@ -347,6 +351,11 @@ def createVV(cl, args):
     vv = createVVWithName(cl, name, args)
     wwn = vv.get('wwn').lower()
     print('{name}:{wwn}'.format(name=name, wwn=wwn))
+
+def getVV(cl, args):
+    vv = cl.getVolume(args.name)
+    wwn = vv.get('wwn').lower()
+    print('{name}:{wwn}'.format(name=args.name, wwn=wwn))
 
 def deleteVV(cl, args):
     name = createVVName(args.namingType, args.id)
