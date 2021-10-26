@@ -68,6 +68,17 @@ API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
 IP="${XPATH_ELEMENTS[j++]:-$IP}"
 NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 
+#-------------------------------------------------------------------------------
+# TM_MAD is not '3par'
+#-------------------------------------------------------------------------------
+
+if [ "$TM_MAD" != "3par" ]; then
+    echo "$DRV_ACTION" | $SSH "$HOST" /var/tmp/one/vmm/kvm/restore "$@"
+    exit $?
+fi
+
+#-------------------------------------------------------------------------------
+
 # get VM disk WWN
 NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
                                                             -p $PASSWORD -nt $NAMING_TYPE -vi $VMID -id checkpoint)
@@ -79,15 +90,6 @@ fi
 
 NAME=$(get_vv_name "$NAME_WWN")
 WWN=$(get_vv_wwn "$NAME_WWN")
-
-#-------------------------------------------------------------------------------
-# TM_MAD is not 'linstor_un'
-#-------------------------------------------------------------------------------
-
-if [ "$TM_MAD" != "3par" ]; then
-    echo "$DRV_ACTION" | $SSH "$HOST" /var/tmp/one/vmm/kvm/restore "$@"
-    exit $?
-fi
 
 #-------------------------------------------------------------------------------
 # Start actions
