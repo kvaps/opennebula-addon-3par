@@ -71,9 +71,13 @@ NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 #-------------------------------------------------------------------------------
 # TM_MAD is not '3par'
 #-------------------------------------------------------------------------------
+if [ "$TM_MAD" = "linstor_un" ]; then
+    echo "$TEMPLATE_64" | ${DRIVER_PATH}/restore_linstor_un "$@"
+    exit $?
+fi
 
 if [ "$TM_MAD" != "3par" ]; then
-    echo "$DRV_ACTION" | $SSH "$HOST" /var/tmp/one/vmm/kvm/restore "$@"
+    echo "$TEMPLATE_64" | $SSH "$HOST" /var/tmp/one/vmm/kvm/restore "$@"
     exit $?
 fi
 

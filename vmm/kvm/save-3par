@@ -57,7 +57,7 @@ unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
-done < <($XPATH     /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/TM_MAD \
+done < <($XPATH     /VMM_DRIVER_ACTION_DATA/DATASTORE/TM_MAD \
                     /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/API_ENDPOINT \
                     /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/IP \
                     /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/CPG \
@@ -92,8 +92,13 @@ QOS_LATENCY="${XPATH_ELEMENTS[j++]:-$QOS_LATENCY}"
 #-------------------------------------------------------------------------------
 # TM_MAD is not '3par'
 #-------------------------------------------------------------------------------P
+if [ "$TM_MAD" = "linstor_un" ]; then
+    echo "$TEMPLATE_64" | ${DRIVER_PATH}/save_linstor_un "$@"
+    exit $?
+fi
+
 if [ "$TM_MAD" != "3par" ]; then
-    echo "$DRV_ACTION" | $SSH "$HOST" /var/tmp/one/vmm/kvm/save "$@"
+    echo "$TEMPLATE_64" | $SSH "$HOST" /var/tmp/one/vmm/kvm/save "$@"
     exit $?
 fi
 

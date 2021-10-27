@@ -46,6 +46,10 @@ DRIVER_PATH=$(dirname $0)
 source ${DRIVER_PATH}/../../etc/datastore/3par/3par.conf
 . ${DRIVER_PATH}/../../datastore/3par/scripts_3par.sh
 
+source ${DRIVER_PATH}/../../datastore/libfs.sh
+source ${DRIVER_PATH}/../../etc/datastore/linstor_un/linstor_un.conf
+source ${DRIVER_PATH}/../../datastore/linstor_un/linstor_utils.sh
+
 # -------- Get mv and datastore arguments from OpenNebula core ------------
 
 SRC=$1
@@ -67,6 +71,9 @@ DST_DIR=`dirname $DST_PATH`
 
 SRC_DS_DIR=`dirname  $SRC_PATH`
 SRC_VM_DIR=`basename $SRC_PATH`
+
+SRC_DIR=`dirname $SRC_PATH`
+DST_DIR=`dirname $DST_PATH`
 
 if [ "$SRC" = "$DST" ]; then
     log "Not moving $SRC to $DST, they are the same path"
@@ -129,6 +136,73 @@ while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
 done < <(onedatastore show -x $SRC_DSID | $XPATH \
                     /DATASTORE/TM_MAD \
+                    /DATASTORE/TEMPLATE/BRIDGE_LIST \
+                    /DATASTORE/TEMPLATE/LS_CONTROLLERS \
+                    /DATASTORE/TEMPLATE/LS_CERTFILE \
+                    /DATASTORE/TEMPLATE/LS_KEYFILE \
+                    /DATASTORE/TEMPLATE/LS_CAFILE \
+                    /DATASTORE/TEMPLATE/RESOURCE_GROUP \
+                    /DATASTORE/TEMPLATE/NODE_LIST \
+                    /DATASTORE/TEMPLATE/LAYER_LIST \
+                    /DATASTORE/TEMPLATE/PROVIDERS \
+                    /DATASTORE/TEMPLATE/REPLICAS_ON_SAME \
+                    /DATASTORE/TEMPLATE/REPLICAS_ON_DIFFERENT \
+                    /DATASTORE/TEMPLATE/AUTO_PLACE \
+                    /DATASTORE/TEMPLATE/REPLICA_COUNT \
+                    /DATASTORE/TEMPLATE/DO_NOT_PLACE_WITH \
+                    /DATASTORE/TEMPLATE/DO_NOT_PLACE_WITH_REGEX \
+                    /DATASTORE/TEMPLATE/STORAGE_POOL \
+                    /DATASTORE/TEMPLATE/DISKLESS_POOL \
+                    /DATASTORE/TEMPLATE/ENCRYPTION)
+
+SRC_TM_MAD="${XPATH_ELEMENTS[j++]}"
+BRIDGE_LIST="${XPATH_ELEMENTS[j++]}"
+LS_CONTROLLERS="${XPATH_ELEMENTS[j++]}"
+LS_CERTFILE="${XPATH_ELEMENTS[j++]}"
+LS_KEYFILE="${XPATH_ELEMENTS[j++]}"
+LS_CAFILE="${XPATH_ELEMENTS[j++]}"
+RESOURCE_GROUP="${XPATH_ELEMENTS[j++]}"
+NODE_LIST="${XPATH_ELEMENTS[j++]}"
+LAYER_LIST="${XPATH_ELEMENTS[j++]}"
+PROVIDERS="${XPATH_ELEMENTS[j++]}"
+REPLICAS_ON_SAME="${XPATH_ELEMENTS[j++]}"
+REPLICAS_ON_DIFFERENT="${XPATH_ELEMENTS[j++]}"
+AUTO_PLACE="${XPATH_ELEMENTS[j++]}"
+REPLICA_COUNT="${XPATH_ELEMENTS[j++]:-$AUTO_PLACE}"
+DO_NOT_PLACE_WITH="${XPATH_ELEMENTS[j++]}"
+DO_NOT_PLACE_WITH_REGEX="${XPATH_ELEMENTS[j++]}"
+STORAGE_POOL="${XPATH_ELEMENTS[j++]}"
+DISKLESS_POOL="${XPATH_ELEMENTS[j++]:-DfltDisklessStorPool}"
+ENCRYPTION="${XPATH_ELEMENTS[j++]}"
+
+unset i j XPATH_ELEMENTS
+
+while IFS= read -r -d '' element; do
+    XPATH_ELEMENTS[i++]="$element"
+done < <(onevm show -x $VMID | $XPATH \
+                    /VM/LCM_STATE)
+
+LCM_STATE="${XPATH_ELEMENTS[j++]}"
+
+linstor_load_keys
+
+#-------------------------------------------------------------------------------
+# Get destination ds information
+#-------------------------------------------------------------------------------
+
+if [ "$SRC_TM_MAD" != "linstor_un" ]; then
+    error_message "Source datastore TM_MAD is not linstor_un"
+    exit 1
+fi
+
+XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
+
+unset i j XPATH_ELEMENTS
+
+while IFS= read -r -d '' element; do
+    XPATH_ELEMENTS[i++]="$element"
+done < <(onedatastore show -x $DST_DSID | $XPATH \
+                    /DATASTORE/TM_MAD \
                     /DATASTORE/TEMPLATE/API_ENDPOINT \
                     /DATASTORE/TEMPLATE/IP \
                     /DATASTORE/TEMPLATE/CPG \
@@ -146,113 +220,27 @@ done < <(onedatastore show -x $SRC_DSID | $XPATH \
                     /DATASTORE/TEMPLATE/QOS_MIN_BW \
                     /DATASTORE/TEMPLATE/QOS_LATENCY)
 
-TM_MAD="${XPATH_ELEMENTS[j++]}"
-SRC_API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
-SRC_IP="${XPATH_ELEMENTS[j++]:-$IP}"
-SRC_CPG="${XPATH_ELEMENTS[j++]:-$CPG}"
-SRC_THIN="${XPATH_ELEMENTS[j++]:-$THIN}"
-SRC_DEDUP="${XPATH_ELEMENTS[j++]:-$DEDUP}"
-SRC_COMPRESSION="${XPATH_ELEMENTS[j++]:-$COMPRESSION}"
-SRC_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
-SRC_PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
-SRC_PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
-SRC_QOS_ENABLE="${XPATH_ELEMENTS[j++]:-$QOS_ENABLE}"
-SRC_QOS_PRIORITY="${XPATH_ELEMENTS[j++]:-$QOS_PRIORITY}"
-SRC_QOS_MAX_IOPS="${XPATH_ELEMENTS[j++]:-$QOS_MAX_IOPS}"
-SRC_QOS_MIN_IOPS="${XPATH_ELEMENTS[j++]:-$QOS_MIN_IOPS}"
-SRC_QOS_MAX_BW="${XPATH_ELEMENTS[j++]:-$QOS_MAX_BW}"
-SRC_QOS_MIN_BW="${XPATH_ELEMENTS[j++]:-$QOS_MIN_BW}"
-SRC_QOS_LATENCY="${XPATH_ELEMENTS[j++]:-$QOS_LATENCY}"
+DST_TM_MAD="${XPATH_ELEMENTS[j++]}"
+DST_API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
+DST_IP="${XPATH_ELEMENTS[j++]:-$IP}"
+DST_CPG="${XPATH_ELEMENTS[j++]:-$CPG}"
+DST_THIN="${XPATH_ELEMENTS[j++]:-$THIN}"
+DST_DEDUP="${XPATH_ELEMENTS[j++]:-$DEDUP}"
+DST_COMPRESSION="${XPATH_ELEMENTS[j++]:-$COMPRESSION}"
+DST_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
+DST_PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
+DST_PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
+DST_QOS_ENABLE="${XPATH_ELEMENTS[j++]:-$QOS_ENABLE}"
+DST_QOS_PRIORITY="${XPATH_ELEMENTS[j++]:-$QOS_PRIORITY}"
+DST_QOS_MAX_IOPS="${XPATH_ELEMENTS[j++]:-$QOS_MAX_IOPS}"
+DST_QOS_MIN_IOPS="${XPATH_ELEMENTS[j++]:-$QOS_MIN_IOPS}"
+DST_QOS_MAX_BW="${XPATH_ELEMENTS[j++]:-$QOS_MAX_BW}"
+DST_QOS_MIN_BW="${XPATH_ELEMENTS[j++]:-$QOS_MIN_BW}"
+DST_QOS_LATENCY="${XPATH_ELEMENTS[j++]:-$QOS_LATENCY}"
 
-if [ "$TM_MAD" = "linstor_un" ]; then
-    exec ${DRIVER_PATH}/mv.linstor_un "$@"
-fi
-
-if [ -z "$SRC_PORTALS" ]; then
-    SRC_PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
-                                                                -p $PASSWORD ${SRC_PORTALS_NUM:+--sort YES})
-    if [ $? -ne 0 ]; then
-        error_message "$SRC_PORTALS"
-        exit 1
-    fi
-fi
-
-#-------------------------------------------------------------------------------
-# Get addtitional image information
-#-------------------------------------------------------------------------------
-
-if [ `is_disk $SRC_PATH` -eq 1 ]; then
-    if [ "$CLONE" = "YES" ] || [ -z "$SRC_NAME_WWN" ]; then
-        # get VM disk WWN
-        SRC_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $SRC_API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
-                                                                      -p $PASSWORD -nt $SRC_NAMING_TYPE -vi $VMID -id $DISK_ID)
-    
-        if [ $? -ne 0 ]; then
-          error_message "$SRC_NAME_WWN"
-          exit 1
-        fi
-    fi
-    
-    SRC_NAME=$(get_vv_name "$SRC_NAME_WWN")
-    SRC_WWN=$(get_vv_wwn "$SRC_NAME_WWN")
-fi
-
-#-------------------------------------------------------------------------------
-# Get destination ds information
-#-------------------------------------------------------------------------------
-
-if [ "$DST_DSID" = "$SRC_DSID" ]; then
-    SAME_3PAR=1
-    DST_API_ENDPOINT="$SRC_API_ENDPOINT"
-    DST_IP="$SRC_IP"
-    DST_CPG="$SRC_CPG"
-    DST_THIN="$SRC_THIN"
-    DST_DEDUP="$SRC_DEDUP"
-    DST_COMPRESSION="$SRC_COMPRESSION"
-    DST_NAMING_TYPE="$SRC_NAMING_TYPE"
-    DST_PORTALS="$SRC_PORTALS"
-    DST_PORTALS_NUM="$SRC_PORTALS_NUM"
-else
-    XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
-    
-    unset i j XPATH_ELEMENTS
-
-    while IFS= read -r -d '' element; do
-        XPATH_ELEMENTS[i++]="$element"
-    done < <(onedatastore show -x $DST_DSID | $XPATH \
-                        /DATASTORE/TEMPLATE/API_ENDPOINT \
-                        /DATASTORE/TEMPLATE/IP \
-                        /DATASTORE/TEMPLATE/CPG \
-                        /DATASTORE/TEMPLATE/THIN \
-                        /DATASTORE/TEMPLATE/DEDUP \
-                        /DATASTORE/TEMPLATE/COMPRESSION \
-                        /DATASTORE/TEMPLATE/NAMING_TYPE \
-                        /DATASTORE/TEMPLATE/PORTALS \
-                        /DATASTORE/TEMPLATE/PORTALS_NUM \
-                        /DATASTORE/TEMPLATE/QOS_ENABLE \
-                        /DATASTORE/TEMPLATE/QOS_PRIORITY \
-                        /DATASTORE/TEMPLATE/QOS_MAX_IOPS \
-                        /DATASTORE/TEMPLATE/QOS_MIN_IOPS \
-                        /DATASTORE/TEMPLATE/QOS_MAX_BW \
-                        /DATASTORE/TEMPLATE/QOS_MIN_BW \
-                        /DATASTORE/TEMPLATE/QOS_LATENCY)
-    
-    DST_API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
-    DST_IP="${XPATH_ELEMENTS[j++]:-$IP}"
-    DST_CPG="${XPATH_ELEMENTS[j++]:-$CPG}"
-    DST_THIN="${XPATH_ELEMENTS[j++]:-$THIN}"
-    DST_DEDUP="${XPATH_ELEMENTS[j++]:-$DEDUP}"
-    DST_COMPRESSION="${XPATH_ELEMENTS[j++]:-$COMPRESSION}"
-    DST_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
-    DST_PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
-    DST_PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
-    DST_QOS_ENABLE="${XPATH_ELEMENTS[j++]:-$QOS_ENABLE}"
-    DST_QOS_PRIORITY="${XPATH_ELEMENTS[j++]:-$QOS_PRIORITY}"
-    DST_QOS_MAX_IOPS="${XPATH_ELEMENTS[j++]:-$QOS_MAX_IOPS}"
-    DST_QOS_MIN_IOPS="${XPATH_ELEMENTS[j++]:-$QOS_MIN_IOPS}"
-    DST_QOS_MAX_BW="${XPATH_ELEMENTS[j++]:-$QOS_MAX_BW}"
-    DST_QOS_MIN_BW="${XPATH_ELEMENTS[j++]:-$QOS_MIN_BW}"
-    DST_QOS_LATENCY="${XPATH_ELEMENTS[j++]:-$QOS_LATENCY}"
+if [ "$DST_TM_MAD" != "3par" ]; then
+    error_message "Destination datastore TM_MAD is not 3par"
+    exit 1
 fi
 
 #-------------------------------------------------------------------------------
@@ -266,90 +254,45 @@ if [ `is_disk $DST_PATH` -eq 0 ]; then
       exit 0
     fi
 
-    # get VM checkpoint WWN, if any
-    SRC_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
-                                                                  -p $PASSWORD -nt $SRC_NAMING_TYPE -vi $VMID -id checkpoint)
-    
-    if [ $? -ne 0 ]; then
-        # for SUSPENDED it must exist otherwise exit with no error
-        if [[ "$LCM_STATE" =~ ^(45|46)$ ]]; then
-            error_message "$SRC_NAME_WWN"
-        else
-            exit 0
-        fi
-    else
-        SRC_NAME=$(get_vv_name "$SRC_NAME_WWN")
-        SRC_WWN=$(get_vv_wwn "$SRC_NAME_WWN")
-    fi
+    SRC_RES="one-vm-${VMID}-checkpoint"
+    SRC_DEV="/dev/drbd/by-res/${SRC_RES}/0"
 
     # Transfer checkpoint across system ds (if any)
-    if [ -n "$SRC_NAME" ]; then
+    # -------- Create image in case of multiple 3pars ------------
+    SIZE=$($LINSTOR -m --output-version v0 volume list -r "$SRC_RES" | $JQ -r '.[].resources[] | .vlms[0].allocated' | sort -n | tail -n1)
 
-        if [ -z "$SAME_3PAR" ]; then
-            ${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
-                                                                            -p $PASSWORD -n $SRC_NAME >/dev/null
-            if [ $? -ne 0 ]; then
-                SAME_3PAR=0
-            else
-                SAME_3PAR=1
-                DST_PORTALS="$SRC_PORTALS"
-            fi
+    if [ -n "$SIZE" ]; then
+
+        DST_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVmVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                        -p $PASSWORD -nt $DST_NAMING_TYPE -tpvv $DST_THIN -tdvv $DST_DEDUP -compr $DST_COMPRESSION \
+                                        -vi $VMID -id checkpoint -c $DST_CPG -sz $SIZE -co "$VM_NAME")
+        
+        if [ $? -ne 0 ]; then
+          error_message "$DST_NAME_WWN"
+          exit 1
         fi
-
-        DST_NAME_WWN="$SRC_NAME_WWN"
-        DST_NAME="$SRC_NAME"
-        DST_WWN="$SRC_WWN"
-    
-        if [ "$SAME_3PAR" = 1 ]; then
-            # If different naming type within same 3par, rename image
-            if [ "$SRC_NAMING_TYPE" != "$DST_NAMING_TYPE" ]; then
-                DST_NAME=$(${DRIVER_PATH}/../../datastore/3par/3par.py mvVmClone -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                                        -snt $SRC_NAMING_TYPE -nt $DST_NAMING_TYPE -vi $VMID  -id $DISK_ID)
-                if [ $? -ne 0 ]; then
-                    error_message "$DST_NAME"
-                    exit 1
-                fi
-            fi
-        else
-            # -------- Create image in case of multiple 3pars ------------
-            SIZE=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
-                                                                            -p $PASSWORD -n $SRC_NAME -t VSIZE)
+        
+        DST_NAME=$(get_vv_name "$DST_NAME_WWN")
+        DST_WWN=$(get_vv_wwn "$DST_NAME_WWN")
+        
+        log "Add disk to VM VV Set"
+        VVSET=$(${DRIVER_PATH}/../../datastore/3par/3par.py addVolumeToVVSet -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                            -nt $DST_NAMING_TYPE -n $DST_NAME -vi $VMID -co "$VM_NAME")
+        
+        if [ $? -ne 0 ]; then
+            error_message "$VVSET"
+            exit 1
+        fi
+        
+        if [ "$QOS_ENABLE" == "YES" ]; then
+            log "Create QoS Policy"
+            QOS=$(${DRIVER_PATH}/../../datastore/3par/3par.py createQosPolicy -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                -nt $DST_NAMING_TYPE -n $DST_NAME -vi $VMID -qp $QOS_PRIORITY -qxi $DST_QOS_MAX_IOPS -qmi $DST_QOS_MIN_IOPS \
+                                -qxb $DST_QOS_MAX_BW -qmb $DST_QOS_MIN_BW -ql $DST_QOS_LATENCY)
+        
             if [ $? -ne 0 ]; then
-                error_message "$SIZE"
+                error_message "$QOS"
                 exit 1
-            fi
-
-            DST_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVmVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
-                                            -p $PASSWORD -nt $DST_NAMING_TYPE -tpvv $DST_THIN -tdvv $DST_DEDUP -compr $DST_COMPRESSION \
-                                            -vi $VMID -id checkpoint -c $DST_CPG -sz $SIZE -co "$VM_NAME")
-    
-            if [ $? -ne 0 ]; then
-              error_message "$DST_NAME_WWN"
-              exit 1
-            fi
-    
-            DST_NAME=$(get_vv_name "$DST_NAME_WWN")
-            DST_WWN=$(get_vv_wwn "$DST_NAME_WWN")
-    
-            log "Add disk to VM VV Set"
-            VVSET=$(${DRIVER_PATH}/../../datastore/3par/3par.py addVolumeToVVSet -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                                -nt $DST_NAMING_TYPE -n $DST_NAME -vi $VMID -co "$VM_NAME")
-            
-            if [ $? -ne 0 ]; then
-                error_message "$VVSET"
-                exit 1
-            fi
-            
-            if [ "$QOS_ENABLE" == "YES" ]; then
-                log "Create QoS Policy"
-                QOS=$(${DRIVER_PATH}/../../datastore/3par/3par.py createQosPolicy -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                                    -nt $DST_NAMING_TYPE -n $DST_NAME -vi $VMID -qp $QOS_PRIORITY -qxi $DST_QOS_MAX_IOPS -qmi $DST_QOS_MIN_IOPS \
-                                    -qxb $DST_QOS_MAX_BW -qmb $DST_QOS_MIN_BW -ql $DST_QOS_LATENCY)
-            
-                if [ $? -ne 0 ]; then
-                    error_message "$QOS"
-                    exit 1
-                fi
             fi
         fi
 
@@ -363,7 +306,7 @@ if [ `is_disk $DST_PATH` -eq 0 ]; then
                 error_message "$DST_HOST_3PAR"
                 exit 1
             fi
-    
+        
             ssh_exec_and_log "$DST_HOST" "$(iscsi_login "$DST_PORTALS" "$DST_PORTALS_NUM")"
 
             LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py exportVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
@@ -389,44 +332,24 @@ EOF
 
         # ------- Perform transfer checkpoint in case of different datastores -----------
         
+        # Attach diskless resource on destination host
+        linstor_attach_diskless "$DST_HOST" "$SRC_RES" "$DISKLESS_POOL"
+
         # Transfer checkpoint across system ds (only for different system datastores)
-        if [ "$DST_DSID" != "$SRC_DSID" ] && [ "$SAME_3PAR" = 0 ]; then
-            COPY_CMD=$(cat <<EOF
-                set -e -o pipefail
-                dd \if=/dev/mapper/3$SRC_WWN bs=${DD_BLOCK_SIZE:-64k} | $SSH $DST_HOST 'dd of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}'
-                sync
+        COPY_CMD=$(cat <<EOF
+            set -e -o pipefail
+            dd \if=${SRC_DEV} of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}
+            sync
 EOF
 )
         
-            ssh_forward ssh_exec_and_log "$SRC_HOST" "$COPY_CMD" \
-                "Error copying $SRC_WWN to $DST_WWN in $SRC_HOST"
-        fi
-        
+        ssh_exec_and_log "$DST_HOST" "$COPY_CMD" \
+            "Error copying $SRC_DEV to $DST_WWN in $SRC_HOST"
+    
         # ------- Deactivate checkpoint on SRC (skip for PROLOG_RESUME + PROLOG_UNDEPLOY) -----------
         if ! [[ "$LCM_STATE" =~ ^(9|31|49|50)$ ]]; then
-            LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-              -n $SRC_NAME -hs $SRC_HOST)
-
-            if [ $? -ne 0 ]; then
-              error_message "$LUN"
-              exit 1
-            fi
-
-            FLUSH_CMD=$(cat <<EOF
-              set -e
-              $(remove_lun "$SRC_WWN")
-EOF
-)
-
-            ssh_exec_and_log "$SRC_HOST" "$FLUSH_CMD" \
-                "Error flushing out mapping"
-
-            ${DRIVER_PATH}/../../datastore/3par/3par.py deleteHost -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                -hs $SRC_HOST >/dev/null
-        
-            if [ $? -eq 0 ]; then
-                ssh_exec_and_log "$SRC_HOST" "$(iscsi_logout "$SRC_PORTALS")"
-            fi
+            linstor_exec_and_log \
+                "resource-definition delete $SRC_RES"
         fi
     fi
 
@@ -456,25 +379,9 @@ EOF
 
     ssh_forward ssh_exec_and_log "$SRC_HOST" "$TAR_SSH" "Error copying disk directory to target host"
 
-    # Delete disk from old system ds (only for different system datastores)
-    if [ -n "$SRC_NAME" ] && [ "$DST_DSID" != "$SRC_DSID" ] && [ "$SAME_3PAR" = 0 ]; then
-        log "Remove checkpoint from VM VV Set"
-        VVSET=$(${DRIVER_PATH}/../../datastore/3par/3par.py deleteVolumeFromVVSet -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                            -nt $SRC_NAMING_TYPE -n $SRC_NAME -vi $VMID)
-        
-        if [ $? -ne 0 ]; then
-            error_message "$VVSET"
-            exit 1
-        fi
-    
-        VV=$(${DRIVER_PATH}/../../datastore/3par/3par.py deleteVmClone -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                            -nt $SRC_NAMING_TYPE -vi $VMID -id checkpoint)
-        if [ $? -ne 0 ]; then
-            error_message "$VV"
-            exit 1
-        fi
-    fi
-
+    # Delete disk from old system ds (for different system datastores)
+    linstor_exec_and_log \
+                "resource-definition delete $SRC_RES"
     
     exit 0
 fi
@@ -482,17 +389,6 @@ fi
 #-------------------------------------------------------------------------------
 # Start actions for disk transfer
 #-------------------------------------------------------------------------------
-
-if [ -z "$SAME_3PAR" ]; then
-    ${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
-                                                                    -p $PASSWORD -n $SRC_NAME >/dev/null
-    if [ $? -ne 0 ]; then
-        SAME_3PAR=0
-    else
-        SAME_3PAR=1
-        DST_PORTALS="$SRC_PORTALS"
-    fi
-fi
 
 if [ -z "$DST_PORTALS" ]; then
     DST_PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
@@ -502,10 +398,6 @@ if [ -z "$DST_PORTALS" ]; then
         exit 1
     fi
 fi
-
-DST_NAME_WWN="$SRC_NAME_WWN"
-DST_NAME="$SRC_NAME"
-DST_WWN="$SRC_WWN"
 
 # Transfer system ds (only for non-persistent images)
 if [ "$CLONE" = "YES" ] || [ "$VOLATILE" = "YES" ]; then
@@ -599,13 +491,13 @@ if [ "$CLONE" = "YES" ] || [ "$VOLATILE" = "YES" ]; then
     if [ "$DST_DSID" != "$SRC_DSID" ] && [ "$SAME_3PAR" = 0 ]; then
         COPY_CMD=$(cat <<EOF
             set -e -o pipefail
-            dd \if=/dev/mapper/3$SRC_WWN bs=${DD_BLOCK_SIZE:-64k} | $SSH $DST_HOST 'dd of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}'
+            dd \if=${SRC_DEV} of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}
             sync
 EOF
 )
     
         ssh_forward ssh_exec_and_log "$SRC_HOST" "$COPY_CMD" \
-            "Error copying $SRC_WWN to $DST_WWN in $SRC_HOST"
+            "Error copying $SRC_DEV to $DST_WWN in $SRC_HOST"
     fi
 fi
 
