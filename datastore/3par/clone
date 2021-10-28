@@ -123,6 +123,16 @@ SRC_PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
 SRC_PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
 SRC_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 
+
+
+# -------- Fallback to linstor_un driver ------------
+
+${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $SRC_API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+                                                                    -p $PASSWORD -n $SRC_NAME >/dev/null
+if [ "$?" -ne 0 ]; then
+    exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
+fi
+
 # -------- Clone image within single 3par ------------
 
 ${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $DST_API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \

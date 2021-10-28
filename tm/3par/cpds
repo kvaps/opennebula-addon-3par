@@ -131,10 +131,17 @@ if [ "$CLONE" = "YES" ] || [ -z "$SRC_NAME_WWN" ]; then
     SRC_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
                                                                   -p $PASSWORD -nt $SRC_NAMING_TYPE -vi $VMID -id $DISK_ID)
     if [ $? -ne 0 ]; then
-      error_message "$SRC_NAME_WWN"
-      exit 1
+        # -------- Fallback to linstor_un driver ------------
+        exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
     fi
 else
+    ${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
+                                                                        -p $PASSWORD -n $SRC_NAME >/dev/null
+    if [ "$?" -ne 0 ]; then
+        # -------- Fallback to linstor_un driver ------------
+        exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
+    fi
+
     DISK_ID=$IMAGE_ID
     CLONE=0
 fi

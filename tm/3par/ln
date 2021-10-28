@@ -121,8 +121,8 @@ VVSET=$(${DRIVER_PATH}/../../datastore/3par/3par.py addVolumeToVVSet -a $API_END
                     -nt $NAMING_TYPE -n $NAME -vi $VMID)
 
 if [ $? -ne 0 ]; then
-  error_message "$VVSET"
-  exit 1
+     # -------- Fallback to linstor_un driver ------------
+     exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
 fi
 
 if [ "$QOS_ENABLE" == "YES" ]; then

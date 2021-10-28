@@ -104,3 +104,8 @@ fi
 
 ${DRIVER_PATH}/../../datastore/3par/3par.py createSnapshot -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD \
                                                         -nt $NAMING_TYPE -id $DISK_ID -vi $VMID -si $SNAP_ID -vc $CLONE
+
+if [ "$?" -ne 0 ]; then
+    trap "" EXIT TERM INT HUP
+    exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
+fi

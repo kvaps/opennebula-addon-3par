@@ -196,8 +196,8 @@ if [ "$SAME_3PAR" = 1 ]; then
                                     -vi $VMID -id $DISK_ID -c $DST_CPG -sz $SIZE -co "$VM_NAME")
 
     if [ $? -ne 0 ]; then
-      error_message "$DST_NAME_WWN"
-      exit 1
+        # -------- Fallback to linstor_un driver ------------
+        exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
     fi
 
     DST_NAME=$(get_vv_name "$DST_NAME_WWN")
@@ -209,8 +209,8 @@ else
                                     -vi $VMID -id $DISK_ID -c $DST_CPG -sz $SIZE -co "$VM_NAME")
 
     if [ $? -ne 0 ]; then
-      error_message "$DST_NAME_WWN"
-      exit 1
+        # -------- Fallback to linstor_un driver ------------
+        exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
     fi
 
     DST_NAME=$(get_vv_name "$DST_NAME_WWN")

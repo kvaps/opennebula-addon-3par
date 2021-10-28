@@ -185,10 +185,11 @@ if [ "$CLONE" == "YES" ] || [ "$DISK_TYPE" == "FILE" ]; then
                                                                 -p $PASSWORD -nt $NAMING_TYPE -vi $VMID -id $DISK_ID)
 
     if [ $? -ne 0 ]; then
-      error_message "$NAME_WWN"
-      exit 1
+        # -------- Fallback to linstor_un driver ------------
+        exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
     fi
 fi
+
 
 if [ -z "$PORTALS" ]; then
     PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \

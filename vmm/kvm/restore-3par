@@ -72,6 +72,7 @@ NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 # TM_MAD is not '3par'
 #-------------------------------------------------------------------------------
 if [ "$TM_MAD" = "linstor_un" ]; then
+    TEMPLATE_64=$(echo "$TEMPLATE_64" | base64 -d | sed 's|<TM_MAD><![CDATA[3par]]></TM_MAD>|<TM_MAD><![CDATA[linstor_un]]></TM_MAD>|g' | base64 -w0)
     echo "$TEMPLATE_64" | ${DRIVER_PATH}/restore_linstor_un "$@"
     exit $?
 fi

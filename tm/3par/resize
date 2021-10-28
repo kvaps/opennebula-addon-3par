@@ -103,8 +103,8 @@ if [ "$PERSISTENT" != "YES" ]; then
                                                                 -p $PASSWORD -nt $NAMING_TYPE -vi $VMID -id $DISK_ID)
 
   if [ $? -ne 0 ]; then
-    error_message "$NAME_WWN"
-    exit 1
+      # -------- Fallback to linstor_un driver ------------
+      exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
   fi
 fi
 
@@ -115,8 +115,12 @@ CURRENT_SIZE=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVVSize -a $API_END
                                                                     -p $PASSWORD -n $NAME -t VSIZE)
 
 if [ $? -ne 0 ]; then
-  error_message "$CURRENT_SIZE"
-  exit 1
+    # -------- Fallback to linstor_un driver ------------
+    if [ "$PERSISTENT" = "YES" ]; then
+        exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
+    fi
+    error_message "$CURRENT_SIZE"
+    exit 1
 fi
 
 GROW_SIZE=`expr $SIZE - $CURRENT_SIZE`

@@ -141,8 +141,19 @@ for j in `seq 1 ${#DISK_IDS[*]}`; do
                                                                         -p $PASSWORD -nt $NAMING_TYPE -vi $VMID -id $DISK_ID)
 
             if [ $? -ne 0 ]; then
-              error_message "$NAME_WWN"
-              exit 1
+                # -------- Fallback to linstor_un driver ------------
+                echo "$TEMPLATE_64" | ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
+                exit $?
+            fi
+
+        else
+
+            ${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+                                                                                -p $PASSWORD -n $NAME >/dev/null
+            if [ "$?" -ne 0 ]; then
+                # -------- Fallback to linstor_un driver ------------
+                echo "$TEMPLATE_64" | ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
+                exit $?
             fi
         fi
 

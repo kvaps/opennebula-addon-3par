@@ -93,6 +93,7 @@ QOS_LATENCY="${XPATH_ELEMENTS[j++]:-$QOS_LATENCY}"
 # TM_MAD is not '3par'
 #-------------------------------------------------------------------------------P
 if [ "$TM_MAD" = "linstor_un" ]; then
+    TEMPLATE_64=$(echo "$TEMPLATE_64" | base64 -d | sed 's|<TM_MAD><![CDATA[3par]]></TM_MAD>|<TM_MAD><![CDATA[linstor_un]]></TM_MAD>|g' | base64 -w0)
     echo "$TEMPLATE_64" | ${DRIVER_PATH}/save_linstor_un "$@"
     exit $?
 fi

@@ -61,3 +61,7 @@ NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 
 ${DRIVER_PATH}/3par.py revertSnapshot -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD -nt $NAMING_TYPE \
                                     -id $ID -si $SNAP_ID
+
+if [ "$?" -ne 0 ]; then
+    exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
+fi

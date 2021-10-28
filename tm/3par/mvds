@@ -105,6 +105,13 @@ if [ -z "$PORTALS" ]; then
     fi
 fi
 
+# -------- Fallback to linstor_un driver ------------
+${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
+                                                                    -p $PASSWORD -n $NAME >/dev/null
+if [ "$?" -ne 0 ]; then
+    exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
+fi
+
 #-------------------------------------------------------------------------------
 # Unmap image from host
 #-------------------------------------------------------------------------------

@@ -62,3 +62,7 @@ IP="${XPATH_ELEMENTS[j++]:-$IP}"
 NAME=$(get_vv_name "$SOURCE")
 
 ${DRIVER_PATH}/3par.py flattenSnapshot -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD -sn $NAME -si $SNAP_ID
+
+if [ "$?" -ne 0 ]; then
+    exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
+fi
