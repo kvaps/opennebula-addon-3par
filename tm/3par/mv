@@ -73,8 +73,6 @@ if [ "$SRC" = "$DST" ]; then
     exit 0
 fi
 
-LCM_STATE=`lcm_state`
-
 #-------------------------------------------------------------------------------
 # Get image information
 #-------------------------------------------------------------------------------
@@ -86,35 +84,39 @@ else
     SRC_DSID=$(echo $SRC_PATH | $AWK -F '/' '{print $(NF-2)}')
     DST_DSID=$(echo $DST_PATH | $AWK -F '/' '{print $(NF-2)}')
     DISK_ID=$(echo "$SRC_PATH" | $AWK -F. '{print $NF}')
+fi
     
-    XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
-    
-    unset i j XPATH_ELEMENTS
-    
-    while IFS= read -r -d '' element; do
-        XPATH_ELEMENTS[i++]="$element"
-    done < <(onevm show -x $VMID| $XPATH \
-                        /VM/NAME \
-                        /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/SOURCE \
-                        /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/IMAGE_ID \
-                        /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/SIZE \
-                        /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/CLONE \
-                        /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/PERSISTENT)
-    
-    VM_NAME="${XPATH_ELEMENTS[j++]}"
-    SRC_NAME_WWN="${XPATH_ELEMENTS[j++]}"
-    IMAGE_ID="${XPATH_ELEMENTS[j++]}"
-    SIZE="${XPATH_ELEMENTS[j++]}"
-    CLONE="${XPATH_ELEMENTS[j++]}"
-    PERSISTENT="${XPATH_ELEMENTS[j++]}"
-    
-    # Disk os clone or volatile, so copy was created
-    if [ "$CLONE" = "YES" ] || [ -z "$SRC_NAME_WWN" ]; then
-        VOLATILE=YES
-    else
-        SRC_DSID=$DSID
-        DST_DSID=$DSID
-    fi
+XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
+
+unset i j XPATH_ELEMENTS
+
+while IFS= read -r -d '' element; do
+    XPATH_ELEMENTS[i++]="$element"
+done < <(onevm show -x $VMID| $XPATH \
+                    /VM/NAME \
+                    /VM/STATE \
+                    /VM/LCM_STATE \
+                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/SOURCE \
+                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/IMAGE_ID \
+                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/SIZE \
+                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/CLONE \
+                    /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/PERSISTENT)
+
+VM_NAME="${XPATH_ELEMENTS[j++]}"
+STATE="${XPATH_ELEMENTS[j++]}"
+LCM_STATE="${XPATH_ELEMENTS[j++]}"
+SRC_NAME_WWN="${XPATH_ELEMENTS[j++]}"
+IMAGE_ID="${XPATH_ELEMENTS[j++]}"
+SIZE="${XPATH_ELEMENTS[j++]}"
+CLONE="${XPATH_ELEMENTS[j++]}"
+PERSISTENT="${XPATH_ELEMENTS[j++]}"
+
+# Disk os clone or volatile, so copy was created
+if [ "$CLONE" = "YES" ] || [ -z "$SRC_NAME_WWN" ]; then
+    VOLATILE=YES
+else
+    SRC_DSID=$DSID
+    DST_DSID=$DSID
 fi
 
 #-------------------------------------------------------------------------------
@@ -272,8 +274,8 @@ if [ `is_disk $DST_PATH` -eq 0 ]; then
     
     if [ $? -ne 0 ]; then
         # for SUSPENDED it must exist otherwise exit with no error
-        if [[ "$LCM_STATE" =~ ^(45|46)$ ]]; then
-            error_message "$SRC_NAME_WWN"
+        if [ "$STATE" = 5 ] || [[ "$LCM_STATE" =~ ^(45|46)$ ]]; then
+            exec ${DRIVER_PATH}/mv.linstor_un "$@"
         else
             exit 0
         fi
@@ -475,7 +477,11 @@ EOF
         fi
     fi
 
-    
+    DISK_IDS=$(onevm show -x $VMID | grep '</DISK_ID>' | grep -oP '[0-9]+')
+    for DISK_ID in $DISK_IDS; do
+        $0 "$1/disk.$DISK_ID" "$2/disk.$DISK_ID" "$3" "$4"
+    done
+
     exit 0
 fi
 
