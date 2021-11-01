@@ -102,6 +102,7 @@ else
         XPATH_ELEMENTS[i++]="$element"
     done < <(onevm show -x $VMID| $XPATH \
                         /VM/NAME \
+                        /VM/TEMPLATE/CONTEXT[DISK_ID=$DISK_ID]/DISK_ID \
                         /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/SOURCE \
                         /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/IMAGE_ID \
                         /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/IMAGE \
@@ -109,11 +110,17 @@ else
                         /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/PERSISTENT)
     
     VM_NAME="${XPATH_ELEMENTS[j++]}"
+    CONTEXT_DISK_ID="${XPATH_ELEMENTS[j++]}"
     SRC_NAME_WWN="${XPATH_ELEMENTS[j++]}"
     IMAGE_ID="${XPATH_ELEMENTS[j++]}"
     IMAGE="${XPATH_ELEMENTS[j++]}"
     CLONE="${XPATH_ELEMENTS[j++]}"
     PERSISTENT="${XPATH_ELEMENTS[j++]}"
+
+    if [ -n "$CONTEXT_DISK_ID" ]; then
+        log "Context disk not need to transfer"
+        exit 0
+    fi
     
     # Disk os clone or volatile, so copy was created
     if [ "$CLONE" = "YES" ] || [ -z "$SRC_NAME_WWN" ]; then
@@ -196,17 +203,17 @@ linstor_load_keys
 # Get destination ds information
 #-------------------------------------------------------------------------------
 
-
-
-if [ "$CLONE" = "YES" ] || [ -z "$SRC_NAME_WWN" ]; then
-    if [ "$SRC_TM_MAD" != "linstor_un" ]; then
-        error_message "Source datastore TM_MAD is not linstor_un"
-        exit 1
-    fi
-else
-    if [ "$SRC_TM_MAD" != "3par" ]; then
-        error_message "Source datastore TM_MAD is not 3par (it should be set to 3par to transfer persistent images)"
-        exit 1
+if [ `is_disk $SRC_PATH` -eq 1 ]; then
+    if [ "$CLONE" = "YES" ] || [ -z "$SRC_NAME_WWN" ]; then
+        if [ "$SRC_TM_MAD" != "linstor_un" ]; then
+            error_message "Source datastore TM_MAD is not linstor_un"
+            exit 1
+        fi
+    else
+        if [ "$SRC_TM_MAD" != "3par" ]; then
+            error_message "Source datastore TM_MAD is not 3par (it should be set to 3par to transfer persistent images)"
+            exit 1
+        fi
     fi
 fi
 
@@ -401,6 +408,11 @@ EOF
     # Delete disk from old system ds (for different system datastores)
     linstor_exec_and_log \
                 "resource-definition delete $SRC_RES"
+
+    DISK_IDS=$(onevm show -x $VMID | grep '</DISK_ID>' | grep -oP '[0-9]+')
+    for DISK_ID in $DISK_IDS; do
+        $0 "$1/disk.$DISK_ID" "$2/disk.$DISK_ID" "$3" "$4"
+    done
     
     exit 0
 fi

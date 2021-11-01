@@ -203,6 +203,29 @@ if [ "$SAME_3PAR" = 1 ]; then
     DST_NAME=$(get_vv_name "$DST_NAME_WWN")
     DST_WWN=$(get_vv_wwn "$DST_NAME_WWN")
 else
+    # Get source image properties
+    XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
+    unset i j XPATH_ELEMENTS
+    
+    while IFS= read -r -d '' element; do
+        XPATH_ELEMENTS[i++]="$element"
+    done < <(oneimage show -x $IMAGE_ID | $XPATH \
+                        /IMAGE/DATASTORE_ID \
+                        /IMAGE/SOURCE)
+    
+    SRC_DSID=${XPATH_ELEMENTS[j++]}
+    SRC_NAME_WWN=${XPATH_ELEMENTS[j++]}
+    
+    SRC_NAME=$(get_vv_name "$SRC_NAME_WWN")
+    SRC_WWN=$(get_vv_wwn "$SRC_NAME_WWN")
+
+
+    ${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
+                                                                        -p $PASSWORD -n $SRC_NAME >/dev/null
+    if [ "$?" -ne 0 ]; then
+        exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
+    fi
+
     # -------- Create image in case of multiple 3pars ------------
     DST_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVmVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
                                     -p $PASSWORD -nt $DST_NAMING_TYPE -tpvv $DST_THIN -tdvv $DST_DEDUP -compr $DST_COMPRESSION \
@@ -210,7 +233,8 @@ else
 
     if [ $? -ne 0 ]; then
         # -------- Fallback to linstor_un driver ------------
-        exec ${DRIVER_PATH}/../linstor_un/$(basename $0) "$@"
+        error_message "$DST_NAME_WWN"
+        exit 1
     fi
 
     DST_NAME=$(get_vv_name "$DST_NAME_WWN")
@@ -278,22 +302,6 @@ if [ "$SAME_3PAR" = 1 ]; then
 fi
 
 # -------- Clone image between multiple 3pars ------------
-
-# Get source image properties
-XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
-unset i j XPATH_ELEMENTS
-
-while IFS= read -r -d '' element; do
-    XPATH_ELEMENTS[i++]="$element"
-done < <(oneimage show -x $IMAGE_ID | $XPATH \
-                    /IMAGE/DATASTORE_ID \
-                    /IMAGE/SOURCE)
-
-SRC_DSID=${XPATH_ELEMENTS[j++]}
-SRC_NAME_WWN=${XPATH_ELEMENTS[j++]}
-
-SRC_NAME=$(get_vv_name "$SRC_NAME_WWN")
-SRC_WWN=$(get_vv_wwn "$SRC_NAME_WWN")
 
 # Get source datastore properties
 XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
