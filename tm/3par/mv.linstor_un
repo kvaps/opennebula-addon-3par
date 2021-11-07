@@ -204,9 +204,9 @@ linstor_load_keys
 #-------------------------------------------------------------------------------
 
 if [ `is_disk $SRC_PATH` -eq 1 ]; then
-    if [ "$CLONE" = "YES" ] || [ -z "$SRC_NAME_WWN" ]; then
-        if [ "$SRC_TM_MAD" != "linstor_un" ]; then
-            error_message "Source datastore TM_MAD is not linstor_un"
+    if [ "$CLONE" = "YES" ]; then
+        if [ "$SRC_TM_MAD" != "linstor_un" ] && [ "$SRC_TM_MAD" != "3par" ]; then
+            error_message "Source datastore TM_MAD is not linstor_un and not 3par"
             exit 1
         fi
     else
@@ -438,7 +438,7 @@ if [ "$CLONE" = "YES" ] || [ "$VOLATILE" = "YES" ]; then
                                       -vi $VMID -id $DISK_ID -c $DST_CPG -sz $SIZE -co "$VM_NAME")
 else
       # Persistent image case
-      DST_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVV -a $DST_API_ENDPOINT -i $IP -s $SECURE -u $USERNAME -p $PASSWORD -nt $DST_NAMING_TYPE \
+      DST_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD -nt $DST_NAMING_TYPE \
                                     -tpvv $DST_THIN -tdvv $DST_DEDUP -compr $DST_COMPRESSION -id $IMAGE_ID -c $DST_CPG -sz $SIZE -co "$IMAGE")
 fi
 

@@ -190,8 +190,8 @@ if [ `is_disk $SRC_PATH` -eq 1 ]; then
                                                                       -p $PASSWORD -nt $SRC_NAMING_TYPE -vi $VMID -id $DISK_ID)
     
         if [ $? -ne 0 ]; then
-          error_message "$SRC_NAME_WWN"
-          exit 1
+            # fallback linstor_un
+            exec ${DRIVER_PATH}/mv.linstor_un "$@"
         fi
     fi
     
@@ -489,12 +489,14 @@ fi
 # Start actions for disk transfer
 #-------------------------------------------------------------------------------
 
-${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
-                                                                -p $PASSWORD -n $SRC_NAME >/dev/null
-
-if [ $? -ne 0 ]; then
-    # fallback linstor_un
-    exec ${DRIVER_PATH}/mv.linstor_un "$@"
+if [ "$CLONE" != "YES" ]; then
+    ${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
+                                                                    -p $PASSWORD -n $SRC_NAME >/dev/null
+    
+    if [ $? -ne 0 ]; then
+        # fallback linstor_un
+        exec ${DRIVER_PATH}/mv.linstor_un "$@"
+    fi
 fi
 
 if [ -z "$SAME_3PAR" ]; then
