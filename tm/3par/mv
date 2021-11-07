@@ -489,6 +489,14 @@ fi
 # Start actions for disk transfer
 #-------------------------------------------------------------------------------
 
+${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
+                                                                -p $PASSWORD -n $SRC_NAME >/dev/null
+
+if [ $? -ne 0 ]; then
+    # fallback linstor_un
+    exec ${DRIVER_PATH}/mv.linstor_un "$@"
+fi
+
 if [ -z "$SAME_3PAR" ]; then
     ${DRIVER_PATH}/../../datastore/3par/3par.py getVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
                                                                     -p $PASSWORD -n $SRC_NAME >/dev/null
