@@ -67,7 +67,6 @@ done < <($XPATH     /DS_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/ENCRYPTION \
                     /DS_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/COMPRESSION \
                     /DS_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/NAMING_TYPE \
                     /DS_DRIVER_ACTION_DATA/IMAGE/NAME \
-                    /DS_DRIVER_ACTION_DATA/IMAGE/SIZE \
                     /DS_DRIVER_ACTION_DATA/IMAGE/CLONING_ID)
 
 ENCRYPTION="${XPATH_ELEMENTS[j++]}"
@@ -82,7 +81,6 @@ DST_DEDUP="${XPATH_ELEMENTS[j++]:-$DEDUP}"
 DST_COMPRESSION="${XPATH_ELEMENTS[j++]:-$COMPRESSION}"
 DST_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 NAME="${XPATH_ELEMENTS[j++]}"
-SIZE="${XPATH_ELEMENTS[j++]}"
 CLONING_ID="${XPATH_ELEMENTS[j++]}"
 
 DST_HOST=`get_destination_host $ID`
@@ -106,7 +104,9 @@ SRC_DSID=${XPATH_ELEMENTS[j++]}
 SRC_RES="one-image-${CLONING_ID}"
 SRC_DEV="/dev/drbd/by-res/${SRC_RES}/0"
 
-SIZE=$($LINSTOR -m --output-version v0 volume-definition list -r "$SRC_RES" | $JQ -r '.[].rsc_dfns[0].vlm_dfns[0].vlm_size' | awk '{printf "%3.0f\n", ($1/1024)+2}')
+SIZE=$($LINSTOR -m --output-version v0 volume-definition list -r "$SRC_RES" | $JQ -r '.[].rsc_dfns[0].vlm_dfns[0].vlm_size' | awk '{printf "%3.0f\n", ($1/1024)}')
+
+SIZE=$(($SIZE+2))
 
 # Get source datastore properties
 XPATH="${DRIVER_PATH}/../../datastore/xpath.rb --stdin"
@@ -261,6 +261,8 @@ COPY_CMD=$(cat <<EOF
     sync
 EOF
 )
+
+onedb change-body image --id "$ID" IMAGE/SIZE "$SIZE"
 
 ssh_forward ssh_exec_and_log "$DST_HOST" "$COPY_CMD" \
     "Error copying $DST_WWN to $DST_WWN in $DST_HOST"
