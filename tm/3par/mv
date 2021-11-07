@@ -186,7 +186,7 @@ fi
 if [ `is_disk $SRC_PATH` -eq 1 ]; then
     if [ "$CLONE" = "YES" ] || [ -z "$SRC_NAME_WWN" ]; then
         # get VM disk WWN
-        SRC_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $SRC_API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
+        SRC_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
                                                                       -p $PASSWORD -nt $SRC_NAMING_TYPE -vi $VMID -id $DISK_ID)
     
         if [ $? -ne 0 ]; then
