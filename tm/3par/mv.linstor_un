@@ -284,7 +284,7 @@ if [ `is_disk $DST_PATH` -eq 0 ]; then
     SRC_RES="one-vm-${VMID}-checkpoint"
     SRC_DEV="/dev/drbd/by-res/${SRC_RES}/0"
 
-    SNAPSHOTS_NUM=$($LINSTOR -m s l -r one-vm-10996-disk-2 | $JQ '.[] | length')
+    SNAPSHOTS_NUM=$($LINSTOR -m s l -r "$SRC_RES" | $JQ '.[] | length')
 
     if [ "$SNAPSHOTS_NUM" -ne 0 ]; then
         error_message "Image has snapshots. Snapshots transfering is not supported"
