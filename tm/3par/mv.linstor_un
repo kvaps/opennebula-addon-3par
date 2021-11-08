@@ -294,99 +294,103 @@ if [ `is_disk $DST_PATH` -eq 0 ]; then
 
     # Transfer checkpoint across system ds (if any)
     # -------- Create image in case of multiple 3pars ------------
-    SIZE=$($LINSTOR -m --output-version v0 volume-definition list -r "$SRC_RES" | $JQ -r '.[].rsc_dfns[0].vlm_dfns[0].vlm_size' | awk '{printf "%3.0f\n", ($1/1024)+2}')
 
-    DST_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVmVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
-                                    -p $PASSWORD -nt $DST_NAMING_TYPE -tpvv $DST_THIN -tdvv $DST_DEDUP -compr $DST_COMPRESSION \
-                                    -vi $VMID -id checkpoint -c $DST_CPG -sz $SIZE -co "$VM_NAME")
-    
-    if [ $? -ne 0 ]; then
-      error_message "$DST_NAME_WWN"
-      exit 1
-    fi
-    
-    DST_NAME=$(get_vv_name "$DST_NAME_WWN")
-    DST_WWN=$(get_vv_wwn "$DST_NAME_WWN")
-    
-    log "Add disk to VM VV Set"
-    VVSET=$(${DRIVER_PATH}/../../datastore/3par/3par.py addVolumeToVVSet -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                        -nt $DST_NAMING_TYPE -n $DST_NAME -vi $VMID -co "$VM_NAME")
-    
-    if [ $? -ne 0 ]; then
-        error_message "$VVSET"
-        exit 1
-    fi
-    
-    if [ "$QOS_ENABLE" == "YES" ]; then
-        log "Create QoS Policy"
-        QOS=$(${DRIVER_PATH}/../../datastore/3par/3par.py createQosPolicy -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                            -nt $DST_NAMING_TYPE -n $DST_NAME -vi $VMID -qp $QOS_PRIORITY -qxi $DST_QOS_MAX_IOPS -qmi $DST_QOS_MIN_IOPS \
-                            -qxb $DST_QOS_MAX_BW -qmb $DST_QOS_MIN_BW -ql $DST_QOS_LATENCY)
-    
+    if [ -n "$SIZE" ]; then
+        SIZE=$($LINSTOR -m --output-version v0 volume-definition list -r "$SRC_RES" | $JQ -r '.[].rsc_dfns[0].vlm_dfns[0].vlm_size' | awk '{printf "%3.0f\n", ($1/1024)+2}')
+
+        DST_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVmVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                        -p $PASSWORD -nt $DST_NAMING_TYPE -tpvv $DST_THIN -tdvv $DST_DEDUP -compr $DST_COMPRESSION \
+                                        -vi $VMID -id checkpoint -c $DST_CPG -sz $SIZE -co "$VM_NAME")
+        
         if [ $? -ne 0 ]; then
-            error_message "$QOS"
+          error_message "$DST_NAME_WWN"
+          exit 1
+        fi
+        
+        DST_NAME=$(get_vv_name "$DST_NAME_WWN")
+        DST_WWN=$(get_vv_wwn "$DST_NAME_WWN")
+        
+        log "Add disk to VM VV Set"
+        VVSET=$(${DRIVER_PATH}/../../datastore/3par/3par.py addVolumeToVVSet -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                            -nt $DST_NAMING_TYPE -n $DST_NAME -vi $VMID -co "$VM_NAME")
+        
+        if [ $? -ne 0 ]; then
+            error_message "$VVSET"
             exit 1
         fi
-    fi
-
-    # ------- Activate checkpoint on DST (skip for EPILOG_STOP + EPILOG_UNDEPLOY) -----------
-    if ! [[ "$LCM_STATE" =~ ^(10|30|41|42)$ ]]; then
-
-        DST_HOST_ISCSI_NAME=$($SSH $DST_HOST sudo cat /etc/iscsi/initiatorname.iscsi | awk -F= '{print $2}')
-        DST_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py setupHost -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-            -hs $DST_HOST -in $DST_HOST_ISCSI_NAME)
-        if [ $? -ne 0 ]; then
-            error_message "$DST_HOST_3PAR"
-            exit 1
-        fi
-
-        if [ -z "$DST_PORTALS" ]; then
-            DST_PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
-                                                                        -p $PASSWORD ${DST_PORTALS_NUM:+--sort YES})
+        
+        if [ "$QOS_ENABLE" == "YES" ]; then
+            log "Create QoS Policy"
+            QOS=$(${DRIVER_PATH}/../../datastore/3par/3par.py createQosPolicy -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                -nt $DST_NAMING_TYPE -n $DST_NAME -vi $VMID -qp $QOS_PRIORITY -qxi $DST_QOS_MAX_IOPS -qmi $DST_QOS_MIN_IOPS \
+                                -qxb $DST_QOS_MAX_BW -qmb $DST_QOS_MIN_BW -ql $DST_QOS_LATENCY)
+        
             if [ $? -ne 0 ]; then
-                error_message "$DST_PORTALS"
+                error_message "$QOS"
                 exit 1
             fi
         fi
-    
-        ssh_exec_and_log "$DST_HOST" "$(iscsi_login "$DST_PORTALS" "$DST_PORTALS_NUM")"
 
-        LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py exportVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                                                                    -n $DST_NAME -hs $DST_HOST)
-        if [ $? -ne 0 ]; then
-            error_message "$LUN"
-            exit 1
+        # ------- Activate checkpoint on DST (skip for EPILOG_STOP + EPILOG_UNDEPLOY) -----------
+        if ! [[ "$LCM_STATE" =~ ^(10|30|41|42)$ ]]; then
+
+            DST_HOST_ISCSI_NAME=$($SSH $DST_HOST sudo cat /etc/iscsi/initiatorname.iscsi | awk -F= '{print $2}')
+            DST_HOST_3PAR=$(${DRIVER_PATH}/../../datastore/3par/3par.py setupHost -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                -hs $DST_HOST -in $DST_HOST_ISCSI_NAME)
+            if [ $? -ne 0 ]; then
+                error_message "$DST_HOST_3PAR"
+                exit 1
+            fi
+
+            if [ -z "$DST_PORTALS" ]; then
+                DST_PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                                                            -p $PASSWORD ${DST_PORTALS_NUM:+--sort YES})
+                if [ $? -ne 0 ]; then
+                    error_message "$DST_PORTALS"
+                    exit 1
+                fi
+            fi
+        
+            ssh_exec_and_log "$DST_HOST" "$(iscsi_login "$DST_PORTALS" "$DST_PORTALS_NUM")"
+
+            LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py exportVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME -p $PASSWORD \
+                                                                        -n $DST_NAME -hs $DST_HOST)
+            if [ $? -ne 0 ]; then
+                error_message "$LUN"
+                exit 1
+            fi
+
+            DISCOVER_CMD=$(cat <<EOF
+                set -e
+                mkdir -p "$DST_DIR"
+                $(discover_lun "$LUN" "$DST_WWN")
+                mkdir -p "$DST_PATH"
+                ln -sf "\$DEV" "$DST_PATH/checkpoint"
+EOF
+)
+            
+            ssh_exec_and_log "$DST_HOST" "$DISCOVER_CMD" \
+                "Error registering $DST_NAME_WWN to $DST_HOST"
         fi
 
-        DISCOVER_CMD=$(cat <<EOF
-            set -e
-            mkdir -p "$DST_DIR"
-            $(discover_lun "$LUN" "$DST_WWN")
-            mkdir -p "$DST_PATH"
-            ln -sf "\$DEV" "$DST_PATH/checkpoint"
+
+        # ------- Perform transfer checkpoint in case of different datastores -----------
+        
+
+        # Attach diskless resource on destination host
+        linstor_attach_diskless "$DST_HOST" "$SRC_RES" "$DISKLESS_POOL"
+
+        # Transfer checkpoint across system ds (only for different system datastores)
+        COPY_CMD=$(cat <<EOF
+            set -e -o pipefail
+            dd \if=${SRC_DEV} of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}
+            sync
 EOF
 )
         
-        ssh_exec_and_log "$DST_HOST" "$DISCOVER_CMD" \
-            "Error registering $DST_NAME_WWN to $DST_HOST"
+        ssh_exec_and_log "$DST_HOST" "$COPY_CMD" \
+            "Error copying $SRC_DEV to $DST_WWN in $SRC_HOST"
     fi
-
-
-    # ------- Perform transfer checkpoint in case of different datastores -----------
-    
-    # Attach diskless resource on destination host
-    linstor_attach_diskless "$DST_HOST" "$SRC_RES" "$DISKLESS_POOL"
-
-    # Transfer checkpoint across system ds (only for different system datastores)
-    COPY_CMD=$(cat <<EOF
-        set -e -o pipefail
-        dd \if=${SRC_DEV} of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}
-        sync
-EOF
-)
-    
-    ssh_exec_and_log "$DST_HOST" "$COPY_CMD" \
-        "Error copying $SRC_DEV to $DST_WWN in $SRC_HOST"
     
     # ------- Deactivate checkpoint on SRC (skip for PROLOG_RESUME + PROLOG_UNDEPLOY) -----------
     if ! [[ "$LCM_STATE" =~ ^(9|31|49|50)$ ]]; then

@@ -24,9 +24,9 @@ LCM_STATE=${XPATH_ELEMENTS[k++]}
 SEQ=${XPATH_ELEMENTS[k++]}
 HOST=${XPATH_ELEMENTS[k++]}
 
-if [ "$STATE" = 3 ] && [ "$LCM_STATE" = 3 ]; then
+if ([ "$STATE" = 3 ] && [ "$LCM_STATE" = 3 ]) || ([ "$STATE" = 8 ] && [ "$LCM_STATE" = 0 ]) || ([ "$STATE" = 5 ] && [ "$LCM_STATE" = 0 ]); then
     onedb change-history --id "$VMID" --seq "$SEQ" HISTORY/TM_MAD 3par
-    onevm migrate "$VMID" "$HOST" "$NEW_DSID"
+    onevm migrate "$VMID" "$HOST" "$NEW_DSID" || exit $?
 elif [ "$STATE" = 3 ] && [ "$LCM_STATE" = 38 ]; then
     onevm recover --retry "$VMID"
 else
@@ -35,7 +35,7 @@ else
 fi
 
 echo -n "Migrating."
-while STATE=$(onevm list -fID=$VMID -lSTAT --no-header) && [ "$STATE" = migr ]; do
+while STATE=$(onevm list -fID=$VMID -lSTAT --no-header) && ([ "$STATE" = migr ] || [ "$STATE" = save ] || [ "$STATE" = boot ]); do
   echo -n '.'
   sleep 5
 done
