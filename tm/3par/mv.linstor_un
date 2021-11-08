@@ -117,6 +117,7 @@ else
     IMAGE_ID="${XPATH_ELEMENTS[j++]}"
     IMAGE="${XPATH_ELEMENTS[j++]}"
     SIZE="${XPATH_ELEMENTS[j++]}"
+    ORIGINAL_SIZE="${XPATH_ELEMENTS[j++]}"
     CLONE="${XPATH_ELEMENTS[j++]}"
     PERSISTENT="${XPATH_ELEMENTS[j++]}"
 
@@ -337,6 +338,15 @@ if [ `is_disk $DST_PATH` -eq 0 ]; then
         if [ $? -ne 0 ]; then
             error_message "$DST_HOST_3PAR"
             exit 1
+        fi
+
+        if [ -z "$DST_PORTALS" ]; then
+            DST_PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
+                                                                        -p $PASSWORD ${DST_PORTALS_NUM:+--sort YES})
+            if [ $? -ne 0 ]; then
+                error_message "$DST_PORTALS"
+                exit 1
+            fi
         fi
     
         ssh_exec_and_log "$DST_HOST" "$(iscsi_login "$DST_PORTALS" "$DST_PORTALS_NUM")"
