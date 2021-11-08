@@ -294,10 +294,9 @@ if [ `is_disk $DST_PATH` -eq 0 ]; then
 
     # Transfer checkpoint across system ds (if any)
     # -------- Create image in case of multiple 3pars ------------
+    SIZE=$($LINSTOR -m --output-version v0 volume-definition list -r "$SRC_RES" | $JQ -r '.[].rsc_dfns[0].vlm_dfns[0].vlm_size' | awk '{printf "%3.0f\n", ($1/1024)+2}')
 
     if [ -n "$SIZE" ]; then
-        SIZE=$($LINSTOR -m --output-version v0 volume-definition list -r "$SRC_RES" | $JQ -r '.[].rsc_dfns[0].vlm_dfns[0].vlm_size' | awk '{printf "%3.0f\n", ($1/1024)+2}')
-
         DST_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVmVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
                                         -p $PASSWORD -nt $DST_NAMING_TYPE -tpvv $DST_THIN -tdvv $DST_DEDUP -compr $DST_COMPRESSION \
                                         -vi $VMID -id checkpoint -c $DST_CPG -sz $SIZE -co "$VM_NAME")
@@ -394,8 +393,10 @@ EOF
     
     # ------- Deactivate checkpoint on SRC (skip for PROLOG_RESUME + PROLOG_UNDEPLOY) -----------
     if ! [[ "$LCM_STATE" =~ ^(9|31|49|50)$ ]]; then
-        linstor_exec_and_log \
-            "resource-definition delete $SRC_RES"
+        if [ -n "$SIZE" ]; then
+            linstor_exec_and_log \
+                "resource-definition delete $SRC_RES"
+        fi
     fi
 
     # for EPILOG_STOP + EPILOG_UNDEPLOY, delete source path and exit
