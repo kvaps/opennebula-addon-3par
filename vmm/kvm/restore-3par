@@ -111,6 +111,7 @@ virsh --connect $LIBVIRT_URI save-image-dumpxml $SRC_PATH > $SRC_XML
 # DS_ID where the checkpoint is placed. This is done in case there was a
 # system DS migration
 
+sed -i "s%/dev/drbd/by-res/one-vm-$VMID-disk-\\([0-9]\+\\)/0%$DS_LOCATION/$DSID/$VMID/disk.\\1%g" $SRC_XML
 sed -i "s%$DS_LOCATION/[0-9]\+/$VMID/%$DS_LOCATION/$DSID/$VMID/%g" $SRC_XML
 sed -i "s%$DS_LOCATION_NON_DOUBLE_SLASH/[0-9]\+/$VMID/%$DS_LOCATION/$DSID/$VMID/%g" $SRC_XML
 EOF

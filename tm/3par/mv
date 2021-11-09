@@ -166,10 +166,6 @@ SRC_QOS_MAX_BW="${XPATH_ELEMENTS[j++]:-$QOS_MAX_BW}"
 SRC_QOS_MIN_BW="${XPATH_ELEMENTS[j++]:-$QOS_MIN_BW}"
 SRC_QOS_LATENCY="${XPATH_ELEMENTS[j++]:-$QOS_LATENCY}"
 
-if [ "$TM_MAD" = "linstor_un" ]; then
-    exec ${DRIVER_PATH}/mv.linstor_un "$@"
-fi
-
 if [ -z "$SRC_PORTALS" ]; then
     SRC_PORTALS=$(${DRIVER_PATH}/../../datastore/3par/3par.py getIscsiPortals -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
                                                                 -p $PASSWORD ${SRC_PORTALS_NUM:+--sort YES})
