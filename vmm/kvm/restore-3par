@@ -44,7 +44,11 @@ source ${DRIVER_PATH}/../../etc/datastore/3par/3par.conf
 
 SRC_PATH=`arg_path $SRC`
 SRC_DIR=`dirname $SRC_PATH`
+DSID=$(echo $SRC | $AWK -F/ '{print $(NF-2)}')
 SRC_XML=${SRC_PATH}.xml
+
+DS_LOCATION=$(echo "$SRC" | $SED 's|(/[^/]*){3}$||g')
+DS_LOCATION_NON_DOUBLE_SLASH=$(echo "$DS_LOCATION" | $SED 's|//|/|g')
 
 #-------------------------------------------------------------------------------
 # Get system ds information
@@ -56,8 +60,7 @@ unset i j XPATH_ELEMENTS
 
 while IFS= read -r -d '' element; do
     XPATH_ELEMENTS[i++]="$element"
-done < <($XPATH     /VMM_DRIVER_ACTION_DATA/DATASTORE/ID \
-                    /VMM_DRIVER_ACTION_DATA/DATASTORE/TM_MAD \
+done < <($XPATH     /VMM_DRIVER_ACTION_DATA/DATASTORE/TM_MAD \
                     /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/API_ENDPOINT \
                     /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/IP \
                     /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/NAMING_TYPE \
@@ -65,7 +68,6 @@ done < <($XPATH     /VMM_DRIVER_ACTION_DATA/DATASTORE/ID \
                     /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/PORTALS_NUM \
                     /VMM_DRIVER_ACTION_DATA/DATASTORE/TEMPLATE/QOS_ENABLE)
 
-DSID="${XPATH_ELEMENTS[j++]}"
 TM_MAD="${XPATH_ELEMENTS[j++]}"
 API_ENDPOINT="${XPATH_ELEMENTS[j++]:-$API_ENDPOINT}"
 IP="${XPATH_ELEMENTS[j++]:-$IP}"
