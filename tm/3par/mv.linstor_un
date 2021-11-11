@@ -540,6 +540,8 @@ EOF
         "Error copying $SRC_DEV to $DST_WWN in $DST_HOST"
 
     onedb change-body vm --id "$VMID" /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/SIZE "$SIZE"
+    onedb change-body vm --id "$VMID" /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/TM_MAD "3par"
+    onedb change-body vm --id "$VMID" /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/TM_MAD_SYSTEM "3par"
     if [ "$VOLATILE" != "YES" ]; then
         onedb change-body vm --id "$VMID" /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/SOURCE "$DST_NAME_WWN"
     fi
