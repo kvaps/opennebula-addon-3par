@@ -272,8 +272,6 @@ if [ `is_disk $DST_PATH` -eq 0 ]; then
         # for SUSPENDED it must exist otherwise exit with no error
         if [ "$STATE" = 5 ] || [[ "$LCM_STATE" =~ ^(45|46)$ ]]; then
             exec ${DRIVER_PATH}/mv.linstor_un "$@"
-        else
-            exit 0
         fi
     else
         SRC_NAME=$(get_vv_name "$SRC_NAME_WWN")
