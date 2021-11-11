@@ -400,8 +400,8 @@ EOF
                 "Error copying $SRC_WWN to $DST_WWN in $SRC_HOST"
         fi
         
-        # ------- Deactivate checkpoint on SRC (skip for PROLOG_RESUME + PROLOG_UNDEPLOY) -----------
-        if ! [[ "$LCM_STATE" =~ ^(9|31|49|50)$ ]]; then
+        # ------- Deactivate checkpoint on SRC (skip for PROLOG_RESUME + PROLOG_UNDEPLOY and same host) -----------
+        if ! [[ "$LCM_STATE" =~ ^(9|31|49|50)$ ]] && [ "$SRC_HOST" != "$DST_HOST" ]; then
             LUN=$(${DRIVER_PATH}/../../datastore/3par/3par.py unexportVV -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD \
               -n $SRC_NAME -hs $SRC_HOST)
 
@@ -621,9 +621,9 @@ EOF
     fi
 fi
 
-# ------- Deactivate disk on SRC (skip for PROLOG_RESUME + PROLOG_UNDEPLOY) -----------
+# ------- Deactivate disk on SRC (skip for PROLOG_RESUME + PROLOG_UNDEPLOY and same host)-----------
 
-if ! [[ "$LCM_STATE" =~ ^(9|31|49|50)$ ]]; then
+if ! [[ "$LCM_STATE" =~ ^(9|31|49|50)$ ]] && [ "$SRC_HOST" != "$DST_HOST" ]; then
     log "Unmapping $SRC_WWN from $SRC_HOST"
     
     # src host in failed state, can not flush disk before unexport
