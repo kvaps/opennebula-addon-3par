@@ -268,8 +268,6 @@ if [ `is_disk $DST_PATH` -eq 0 ]; then
         # for SUSPENDED it must exist otherwise exit with no error
         if [[ "$LCM_STATE" =~ ^(45|46)$ ]]; then
             error_message "$SRC_NAME_WWN"
-        else
-            exit 0
         fi
     else
         SRC_NAME=$(get_vv_name "$SRC_NAME_WWN")
@@ -469,7 +467,11 @@ EOF
         fi
     fi
 
-    
+    DISK_IDS=$(onevm show -x $VMID | grep '</DISK_ID>' | grep -oP '[0-9]+')
+    for DISK_ID in $DISK_IDS; do
+        $0 "$1/disk.$DISK_ID" "$2/disk.$DISK_ID" "$3" "$4"
+    done
+
     exit 0
 fi
 
