@@ -81,7 +81,9 @@ function iscsi_login {
 
         set -e
         for PORTAL in $PORTALS; do
-            [ -n "$PORTALS_NUM" ] && [ "\$CONNECTIONS_NUM" -lt "$PORTALS_NUM" ] || break
+            if [ -n "$PORTALS_NUM" ] && [ "\$CONNECTIONS_NUM" -lt "$PORTALS_NUM" ]; then
+                break
+            fi
             if ! echo "\$CONNECTIONS" | grep -q "\$PORTAL[:,]"; then
                 sudo iscsiadm -m discovery -t sendtargets -p "\$PORTAL"
                 sudo iscsiadm -m node -l all -p "\$PORTAL"
