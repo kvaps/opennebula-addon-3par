@@ -42,11 +42,9 @@ pip3 install python-3parclient xmltodict
 ### OpenNebula Node (or Bridge Node)
 
 * sg3_utils package installed
-* `/etc/multipath.conf` need to have set `user_friendly_names no`, because we use WWNs instead of `mpathx` aliasses
 * `/etc/sudoers.d/opennebula` - add `ONE_3PAR` cmd alias
 
 ```
-sed -i /etc/multipath.conf -e '/user_friendly_names/ s/yes/no/'
 cat > /etc/sudoers.d/opennebula-3par <<\EOT
 Cmnd_Alias ONE_3PAR = /sbin/multipath, /usr/sbin/multipathd, /sbin/dmsetup, /usr/sbin/blockdev, /usr/bin/tee /sys/block/*/device/delete, /usr/bin/rescan-scsi-bus.sh, /usr/sbin/iscsiadm, /usr/bin/cat /etc/iscsi/initiatorname.iscsi
 oneadmin ALL=(ALL) NOPASSWD: ONE_3PAR

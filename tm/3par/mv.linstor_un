@@ -382,7 +382,7 @@ EOF
         # Transfer checkpoint across system ds (only for different system datastores)
         COPY_CMD=$(cat <<EOF
             set -e -o pipefail
-            dd \if=${SRC_DEV} of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}
+            dd \if=${SRC_DEV} of=/dev/disk/by-id/wwn-0x$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}
             sync
 EOF
 )
@@ -531,7 +531,7 @@ EOF
     # ------- Perform transfer in case of different datastores -----------
     COPY_CMD=$(cat <<EOF
         set -e -o pipefail
-        dd \if=${SRC_DEV} of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}
+        dd \if=${SRC_DEV} of=/dev/disk/by-id/wwn-0x$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}
         sync
 EOF
 )

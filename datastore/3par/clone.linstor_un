@@ -257,7 +257,7 @@ ssh_exec_and_log "$DST_HOST" "$DISCOVER_CMD" \
 # copy image
 COPY_CMD=$(cat <<EOF
     set -e -o pipefail
-    dd \if=$SRC_DEV bs=${DD_BLOCK_SIZE:-64k} of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}
+    dd \if=$SRC_DEV bs=${DD_BLOCK_SIZE:-64k} of=/dev/disk/by-id/wwn-0x$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}
     sync
 EOF
 )

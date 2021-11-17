@@ -389,7 +389,7 @@ EOF
         if [ "$DST_DSID" != "$SRC_DSID" ] && [ "$SAME_3PAR" = 0 ]; then
             COPY_CMD=$(cat <<EOF
                 set -e -o pipefail
-                dd \if=/dev/mapper/3$SRC_WWN bs=${DD_BLOCK_SIZE:-64k} | $SSH $DST_HOST 'dd of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}'
+                dd \if=/dev/disk/by-id/wwn-0x$SRC_WWN bs=${DD_BLOCK_SIZE:-64k} | $SSH $DST_HOST 'dd of=/dev/disk/by-id/wwn-0x$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}'
                 sync
 EOF
 )
@@ -609,7 +609,7 @@ if [ "$CLONE" = "YES" ] || [ "$VOLATILE" = "YES" ]; then
     if [ "$DST_DSID" != "$SRC_DSID" ] && [ "$SAME_3PAR" = 0 ]; then
         COPY_CMD=$(cat <<EOF
             set -e -o pipefail
-            dd \if=/dev/mapper/3$SRC_WWN bs=${DD_BLOCK_SIZE:-64k} | $SSH $DST_HOST 'dd of=/dev/mapper/3$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}'
+            dd \if=/dev/disk/by-id/wwn-0x$SRC_WWN bs=${DD_BLOCK_SIZE:-64k} | $SSH $DST_HOST 'dd of=/dev/disk/by-id/wwn-0x$DST_WWN bs=${DD_BLOCK_SIZE:-64k} conv=${DD_CONV:-sparse}'
             sync
 EOF
 )
