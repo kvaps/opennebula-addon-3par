@@ -199,7 +199,7 @@ ssh_exec_and_log "$DST_HOST" "$DISCOVER_CMD" \
 
 GET_DEV_CMD=$(cat <<EOF
     set -e
-    DEV="/dev/mapper/3$WWN"
+    DEV="/dev/disk/by-id/wwn-0x$WWN"
     
     echo "\$DEV"
 EOF

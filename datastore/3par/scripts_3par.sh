@@ -114,7 +114,7 @@ function discover_lun {
         $(rescan_scsi_bus "$LUN")
         $(multipath_rescan)
 
-        DEV="/dev/mapper/3$WWN"
+        DEV="/dev/disk/by-id/wwn-0x$WWN"
 
         # Wait a bit for new mapping
         COUNTER=1
@@ -156,7 +156,7 @@ function remove_lun {
     local WWN
     WWN="$1"
     cat <<EOF
-      DEV="/dev/mapper/3$WWN"
+      DEV="/dev/disk/by-id/wwn-0x$WWN"
       if DM_HOLDER=\$($SUDO $DMSETUP ls -o blkdevname | grep -Po "(?<=3$WWN\s\()[^)]+"); then
           DM_SLAVE=\$(ls /sys/block/\${DM_HOLDER}/slaves)
 
