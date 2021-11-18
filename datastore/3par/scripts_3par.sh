@@ -81,7 +81,7 @@ function iscsi_login {
 
         set -e
         for PORTAL in $PORTALS; do
-            if [ -n "$PORTALS_NUM" ] && [ "\$CONNECTIONS_NUM" -lt "$PORTALS_NUM" ]; then
+            if [ -n "$PORTALS_NUM" ] && [ "\$CONNECTIONS_NUM" -ge "$PORTALS_NUM" ]; then
                 break
             fi
             if ! echo "\$CONNECTIONS" | grep -q "\$PORTAL[:,]"; then
