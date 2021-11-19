@@ -50,13 +50,13 @@ function rescan_scsi_bus {
   # important to ignore rev, otherwise rescan failed when 3PAR OS get major update and device is online resized
   # https://gitlab.feldhost.cz/feldhost-public/one-addon-3par/-/issues/1
   [ "$2" == "force" ] && FORCE=" --forcerescan  --ignore-rev"
-  echo "HOSTS=\$(
-    (if [ -f /proc/scsi/scsi ]; then 
+  echo "HOSTS=\$((
+    if [ -f /proc/scsi/scsi ]; then 
       cat /proc/scsi/scsi
     else 
       lsscsi -c
-     fi) 
-  | awk -v RS=\"Type:\" '\$0 ~ \"Vendor: 3PARdata\" {print \$0}' |grep -Po \"scsi[0-9]+\"|grep -Eo \"[0-9]+\" |sort|uniq|paste -sd \",\" -)"
+    fi
+  ) | awk -v RS=\"Type:\" '\$0 ~ \"Vendor: 3PARdata\" {print \$0}' |grep -Po \"scsi[0-9]+\"|grep -Eo \"[0-9]+\" |sort|uniq|paste -sd \",\" -)"
   echo "$SUDO /usr/bin/rescan-scsi-bus.sh --hosts=\$HOSTS --luns=$LUN --nooptscan$FORCE"
 }
 
