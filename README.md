@@ -16,6 +16,7 @@ More info:
 
 * Original design and implementation: Kristian Feldsam (feldsam@feldhost.net)
 * Rework and new versions adaptation: Andrei Kvapil (kvapss@gmail.com)
+* Debian adaptation and tests: Egor Pronin (pronin.egor@gmail.com)
 
 ## Support
 
@@ -34,11 +35,20 @@ This add-on is developed and tested with:
 * Password-less SSH access from the front-end `oneadmin` user to the `node` instances.
 * 3PAR python package `python-3parclient` installed, WSAPI username, password and access to the 3PAR API network
 
+#### Ubuntu
+
 ```bash
 apt-get install python python3-pip
 pip3 install python-3parclient xmltodict
 ```
 
+#### Debian
+
+```bash
+apt-get install python python-dev python3-dev python3-pip python3-setuptools build-essential libssl-dev libffi-dev
+pip3 install --upgrade pip
+pip3 install python-3parclient xmltodict
+```
 ### OpenNebula Node (or Bridge Node)
 
 * sg3_utils package installed
@@ -51,8 +61,14 @@ oneadmin ALL=(ALL) NOPASSWD: ONE_3PAR
 EOT
 ```
 
+#### Ubuntu
 ```bash
 apt-get install open-iscsi multipath-tools
+```
+
+#### Debian
+```bash
+apt-get install open-iscsi multipath-tools lsscsi netcat-openbsd
 ```
 
 ## Features
@@ -79,7 +95,7 @@ Support standard OpenNebula datastore operations:
 1. FibreChannel is not currently supported.
 1. Tested only with KVM hypervisor
 1. When SYSTEM datastore is in use the reported free/used/total space is the space on 3PAR CPG. (On the host filesystem there are mostly symlinks and small files that do not require much disk space)
-1. Tested/confirmed working on Ubuntu 20.04 (Frontend) and Ubuntu 20.04 (Nodes).
+1. Tested/confirmed working on Ubuntu 20.04 (Frontend) and Ubuntu 20.04 (Nodes) / Debian 10 (Frontend and Nodes).
 
 ## ToDo
 
@@ -92,7 +108,7 @@ The installation instructions are for OpenNebula 5.6+.
 ### Get the addon from github
 ```bash
 cd ~
-git clone https://github.com/OpenNebula/addon-3par.git
+git clone https://github.com/kvaps/opennebula-addon-3par.git
 ```
 
 ### Installation
@@ -103,10 +119,10 @@ The following commands are related to latest OpenNebula version.
 
 * Copy 3PAR's DATASTORE_MAD driver files
 ```bash
-cp -a ~/addon-3par/datastore/3par /var/lib/one/remotes/datastore/
+cp -a ~/opennebula-addon-3par/datastore/3par /var/lib/one/remotes/datastore/
 
 # copy config
-cp -a ~/addon-3par/etc/datastore/3par /var/lib/one/remotes/etc/datastore/
+cp -a ~/opennebula-addon-3par/etc/datastore/3par /var/lib/one/remotes/etc/datastore/
 
 # fix ownership
 chown -R oneadmin.oneadmin /var/lib/one/remotes/datastore/3par /var/lib/one/remotes/etc/datastore/3par
@@ -115,10 +131,18 @@ chown -R oneadmin.oneadmin /var/lib/one/remotes/datastore/3par /var/lib/one/remo
 
 * Copy 3PAR's TM_MAD driver files
 ```bash
-cp -a ~/addon-3par/tm/3par /var/lib/one/remotes/tm/
+cp -a ~/opennebula-addon-3par/tm/3par /var/lib/one/remotes/tm/
 
 # fix ownership
 chown -R oneadmin.oneadmin /var/lib/one/remotes/tm/3par
+```
+
+* Copy 3PAR's VM_MAD driver files
+```bash
+cp -a ~/opennebula-addon-3par/vmm/kvm /var/lib/one/remotes/vmm/
+
+# fix ownership
+chown -R oneadmin.oneadmin /var/lib/one/remotes/vmm/kvm
 ```
 
 ### Addon configuration
@@ -175,7 +199,7 @@ LIVE_DISK_SNAPSHOTS="kvm-qcow2 kvm-ceph kvm-3par"
 ### Post-install
 * Restart `opennebula` service
 ```bash
-systemtl restart opennebula
+systemctl restart opennebula
 ```
 * As oneadmin user (re)sync the remote scripts
 ```bash
