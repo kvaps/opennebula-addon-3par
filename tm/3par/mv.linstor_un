@@ -440,9 +440,9 @@ EOF
     linstor_exec_and_log \
                 "resource-definition delete $SRC_RES"
 
-    DISK_IDS=$(onevm show -x $VMID | grep '</DISK_ID>' | grep -oP '[0-9]+')
-    for DISK_ID in $DISK_IDS; do
-        $0 "$1/disk.$DISK_ID" "$2/disk.$DISK_ID" "$3" "$4"
+    DISK_IDS=$(onevm show $VMID -x | ${DRIVER_PATH}/../../datastore/xpath.rb --stdin '%m%/VM/TEMPLATE/DISK/DISK_ID')
+    for k in $DISK_IDS; do
+        $0 "$1/disk.$k" "$2/disk.$k" "$3" "$4"
     done
     
     exit 0
