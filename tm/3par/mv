@@ -101,7 +101,7 @@ else
                         /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/CLONE \
                         /VM/TEMPLATE/DISK[DISK_ID=$DISK_ID]/PERSISTENT)
     
-    VM_NAME="${XPATH_ELEMENTS[j++]}"
+    VM_NAME="${XPATH_ELEMENTS[j++]//[^A-Za-z0-9\[\]() _~+-]/}"
     SRC_NAME_WWN="${XPATH_ELEMENTS[j++]}"
     IMAGE_ID="${XPATH_ELEMENTS[j++]}"
     SIZE="${XPATH_ELEMENTS[j++]}"
