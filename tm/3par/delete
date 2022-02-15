@@ -56,35 +56,6 @@ DST_PATH=`arg_path $DST`
 DST_HOST=`arg_host $DST`
 
 #-------------------------------------------------------------------------------
-# Return if deleting a disk, we will delete them when removing the
-# remote_system_ds directory for the VM (remotely)
-#-------------------------------------------------------------------------------
-
-log "Deleting $DST_PATH"
-
-delete_file=$(cat <<EOF
-[ -e "$DST_PATH" ] || exit 0
-
-times=10
-function="rm -rf $DST_PATH"
-
-count=1
-
-ret=\$(\$function)
-error=\$?
-
-while [ \$count -lt \$times -a "\$error" != "0" ]; do
-    sleep 1
-    count=\$(( \$count + 1 ))
-    ret=\$(\$function)
-    error=\$?
-done
-
-[ "x\$error" = "x0" ]
-EOF
-)
-
-#-------------------------------------------------------------------------------
 # Get image information
 #-------------------------------------------------------------------------------
 
@@ -137,6 +108,35 @@ fi
 if [ "$LAST_HOST" == "$DST_HOST" ]; then
   ssh_exec_and_log $DST_HOST "$delete_file" "Error deleting $DST_PATH"
 fi
+
+#-------------------------------------------------------------------------------
+# Return if deleting a disk, we will delete them when removing the
+# remote_system_ds directory for the VM (remotely)
+#-------------------------------------------------------------------------------
+
+log "Deleting $DST_PATH"
+
+delete_file=$(cat <<EOF
+[ -e "$DST_PATH" ] || exit 0
+
+times=10
+function="rm -rf $DST_PATH"
+
+count=1
+
+ret=\$(\$function)
+error=\$?
+
+while [ \$count -lt \$times -a "\$error" != "0" ]; do
+    sleep 1
+    count=\$(( \$count + 1 ))
+    ret=\$(\$function)
+    error=\$?
+done
+
+[ "x\$error" = "x0" ]
+EOF
+)
 
 #-------------------------------------------------------------------------------
 # Get image ds information
