@@ -105,10 +105,6 @@ if [ "$CLONE" == "NO" ] && [ "$DISK_TYPE" == "BLOCK" ]; then
     [ "$RUNNING_VMS" != "1" ] && exit 0
 fi
 
-if [ "$LAST_HOST" == "$DST_HOST" ]; then
-  ssh_exec_and_log $DST_HOST "$delete_file" "Error deleting $DST_PATH"
-fi
-
 #-------------------------------------------------------------------------------
 # Return if deleting a disk, we will delete them when removing the
 # remote_system_ds directory for the VM (remotely)
@@ -137,6 +133,10 @@ done
 [ "x\$error" = "x0" ]
 EOF
 )
+
+if [ "$LAST_HOST" == "$DST_HOST" ]; then
+  ssh_exec_and_log $DST_HOST "$delete_file" "Error deleting $DST_PATH"
+fi
 
 #-------------------------------------------------------------------------------
 # Get image ds information
