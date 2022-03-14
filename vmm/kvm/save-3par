@@ -138,7 +138,7 @@ SIZE=$((SIZE_K/1024))
 
 NEW_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVmVV -a $API_ENDPOINT -i $IP -s $SECURE -u $USERNAME \
                                 -p $PASSWORD -nt $NAMING_TYPE -tpvv $THIN -tdvv $DEDUP -compr $COMPRESSION \
-                                -vi $VMID -id checkpoint -c $CPG -sz $SIZE -co "$VM_NAME")
+                                -vi $VMID -id cp -c $CPG -sz $SIZE -co "$VM_NAME")
 
 if [ $? -ne 0 ]; then
   error_message "$NEW_NAME_WWN"

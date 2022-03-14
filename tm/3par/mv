@@ -262,8 +262,8 @@ if [ `is_disk $DST_PATH` -eq 0 ]; then
 
     # get VM checkpoint WWN, if any
     SRC_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py getVmClone -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME \
-                                                                  -p $PASSWORD -nt $SRC_NAMING_TYPE -vi $VMID -id checkpoint)
-    
+                                                                  -p $PASSWORD -nt $SRC_NAMING_TYPE -vi $VMID -id cp)
+
     if [ $? -ne 0 ]; then
         # for SUSPENDED it must exist otherwise exit with no error
         if [[ "$LCM_STATE" =~ ^(45|46)$ ]]; then
@@ -313,8 +313,8 @@ if [ `is_disk $DST_PATH` -eq 0 ]; then
 
             DST_NAME_WWN=$(${DRIVER_PATH}/../../datastore/3par/3par.py createVmVV -a $DST_API_ENDPOINT -i $DST_IP -s $SECURE -u $USERNAME \
                                             -p $PASSWORD -nt $DST_NAMING_TYPE -tpvv $DST_THIN -tdvv $DST_DEDUP -compr $DST_COMPRESSION \
-                                            -vi $VMID -id checkpoint -c $DST_CPG -sz $SIZE -co "$VM_NAME")
-    
+                                            -vi $VMID -id cp -c $DST_CPG -sz $SIZE -co "$VM_NAME")
+
             if [ $? -ne 0 ]; then
               error_message "$DST_NAME_WWN"
               exit 1
@@ -460,7 +460,7 @@ EOF
         fi
     
         VV=$(${DRIVER_PATH}/../../datastore/3par/3par.py deleteVmClone -a $SRC_API_ENDPOINT -i $SRC_IP -s $SECURE -u $USERNAME -p $PASSWORD \
-                            -nt $SRC_NAMING_TYPE -vi $VMID -id checkpoint)
+                            -nt $SRC_NAMING_TYPE -vi $VMID -id cp)
         if [ $? -ne 0 ]; then
             error_message "$VV"
             exit 1

@@ -335,7 +335,7 @@ def monitorCPG(cl, args):
         diskResult = []
         for disk in disks:
           if disk.get('CLONE') == 'YES' or disk.get('SOURCE') is None or disk.get('SOURCE') == '':
-            name = '{namingType}.one.vm.{vmId}.{diskId}.vv'.format(namingType=args.namingType, vmId=vm.get('ID'), diskId=disk.get('DISK_ID'))
+            name = '{namingType}.vm.{vmId}.{diskId}'.format(namingType=args.namingType, vmId=vm.get('ID'), diskId=disk.get('DISK_ID'))
           else:
             source = disk.get('SOURCE').split(':')
             name = source[0]
@@ -517,7 +517,7 @@ def mvVmClone(cl, args):
 
 def createVVSetSnapshot(cl, args):
     snapId = 's{snapId}'.format(snapId=args.snapId)
-    vvsetName = '{namingType}.one.vm.{vmId}.vvset'.format(namingType=args.namingType, vmId=args.vmId)
+    vvsetName = '{namingType}.vm.{vmId}'.format(namingType=args.namingType, vmId=args.vmId)
 
     # get volume set info
     try:
@@ -559,7 +559,7 @@ def createVVSetSnapshot(cl, args):
 
 def deleteVVSetSnapshot(cl, args):
     snapId = 's{snapId}'.format(snapId=args.snapId)
-    vvsetName = '{namingType}.one.vm.{vmId}.vvset'.format(namingType=args.namingType, vmId=args.vmId)
+    vvsetName = '{namingType}.vm.{vmId}'.format(namingType=args.namingType, vmId=args.vmId)
 
     # get volume set info
     try:
@@ -769,7 +769,7 @@ def getIscsiPortals(cl, args):
     return
 
 def addVolumeToVVSet(cl, args):
-    vvsetName = '{namingType}.one.vm.{vmId}.vvset'.format(namingType=args.namingType, vmId=args.vmId)
+    vvsetName = '{namingType}.vm.{vmId}'.format(namingType=args.namingType, vmId=args.vmId)
 
     # get or create vvset
     try:
@@ -786,7 +786,7 @@ def addVolumeToVVSet(cl, args):
 
 
 def deleteVolumeFromVVSet(cl, args):
-    vvsetName = '{namingType}.one.vm.{vmId}.vvset'.format(namingType=args.namingType, vmId=args.vmId)
+    vvsetName = '{namingType}.vm.{vmId}'.format(namingType=args.namingType, vmId=args.vmId)
 
     # remove volume from volume set
     try:
@@ -814,7 +814,7 @@ def deleteVolumeFromVVSet(cl, args):
 
 
 def createQosPolicy(cl, args):
-    vvsetName = '{namingType}.one.vm.{vmId}.vvset'.format(namingType=args.namingType, vmId=args.vmId)
+    vvsetName = '{namingType}.vm.{vmId}'.format(namingType=args.namingType, vmId=args.vmId)
 
     # create QoS policy if not exists
     qosRules = prepareQosRules(args)
@@ -835,7 +835,7 @@ def createQosPolicy(cl, args):
 
 
 def deleteQosPolicy(cl, args):
-    vvsetName = '{namingType}.one.vm.{vmId}.vvset'.format(namingType=args.namingType, vmId=args.vmId)
+    vvsetName = '{namingType}.vm.{vmId}'.format(namingType=args.namingType, vmId=args.vmId)
 
     # get volume set info
     try:
@@ -863,10 +863,10 @@ def createPortName(portPos):
     return '{node}:{slot}:{cardPort}'.format(node=portPos['node'], slot=portPos['slot'], cardPort=portPos['cardPort'])
 
 def createVVName(namingType, id):
-    return '{namingType}.one.{id}.vv'.format(namingType=namingType, id=id)
+    return '{namingType}.{id}'.format(namingType=namingType, id=id)
 
 def createVmCloneName(namingType, id, vmId):
-    return '{namingType}.one.vm.{vmId}.{id}.vv'.format(namingType=namingType, id=id, vmId=vmId)
+    return '{namingType}.vm.{vmId}.{id}'.format(namingType=namingType, id=id, vmId=vmId)
 
 def createSnapshotNameAndMetaKey(srcName, snapId):
     name = '{srcName}.{snapId}'.format(srcName=srcName, snapId=snapId)
