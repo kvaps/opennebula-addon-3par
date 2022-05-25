@@ -213,7 +213,7 @@ directory and have to be installed to `/var/lib/one/remotes/vmm/kvm/`.
 
 ### Configuring the System Datastore
 
-This addon enables full support of transfer manager (TM_MAD) backend of type 3par for the system datastore.  
+This addon enables full support of transfer manager (TM_MAD) backend of type 3par for the system datastore.
 The system datastore will hold only the symbolic links to the 3PAR block devices and context isos, so it will not take much space. See more details on the [Open Cloud Storage Setup](https://docs.opennebula.org/5.8/deployment/open_cloud_storage_setup/).
 
 ### Configuring the Datastore
@@ -239,8 +239,8 @@ Some configuration attributes must be set to enable a datastore as 3PAR enabled 
 
 1. Volume names are created according to best practices naming conventions.
    `<TYPE>` part - can be prd for production servers, dev for development servers, tst for test servers, etc.
-   Volume name will be `<TYPE>.one.<IMAGE_ID>.vv` for ex. `dev.one.1.vv` or `tst.one.3.vv`
-   
+   Volume name will be `<TYPE>.<IMAGE_ID>` for ex. `dev.1` or `tst.3`
+
 2. Quoted, space separated list of server hostnames which are Hosts on the 3PAR System.
 
 3. QoS Rules - Applied per VM, so if VM have multiple disks, them QoS policy applies to all VM disks
