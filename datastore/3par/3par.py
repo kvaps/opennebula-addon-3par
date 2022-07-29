@@ -394,7 +394,15 @@ def copyVV(cl, args):
   cl.copyVolume(srcName, args.destName, args.cpg, optional)
 
 def growVV(cl, args):
+    rcgName = ".".join(args.name.split(".")[:-1])
+    rcgExists = True
+    try:
+        cl.stopRemoteCopy(rcgName)
+    except exceptions.HTTPNotFound:
+        rcgExists = False
     cl.growVolume(args.name, args.growBy)
+    if rcgExists:
+        cl.startRemoteCopy(rcgName)
 
 def getVVSize(cl, args):
     vv = cl.getVolume(args.name)
@@ -899,6 +907,11 @@ def createVVWithName(cl, name, args):
     return cl.getVolume(name)
 
 def deleteVVWithName(cl, name):
+    rcgName = ".".join(args.name.split(".")[:-1])
+    try:
+        cl.stopRemoteCopy(rcgName)
+    except exceptions.HTTPNotFound:
+        pass
     if args.softDelete:
         cl.modifyVolume(name, {'expirationHours': 168})
         # find and delete snapshots
