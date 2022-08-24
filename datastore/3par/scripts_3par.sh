@@ -180,6 +180,19 @@ function remove_lun {
 EOF
 }
 
+function start_ssh_connection {
+    local HOST=$1
+    local USERNAME=$2
+    local PASSWORD=$3
+    local SSH_ARGS="-o ControlPath=/run/one/.ssh/ssh-control-%h-%p-%r -o ControlMaster=auto -o ControlPersist=600 -l $USERNAME"
+    mkdir -p /run/one/.ssh/
+    echo "$PASSWORD" | ${DRIVER_PATH}/../../datastore/3par/sshpass.sh $SSH $SSH_ARGS "$HOST" exit
+    if [ $? -ne 0 ]; then
+        return $?
+    fi
+    SSH="$SSH $SSH_ARGS"
+}
+
 # Dummy ssh-agent function to support OpenNebula <5.12
 if ! declare -F ssh_forward >/dev/null; then
     ssh_forward(){ "$@"; }

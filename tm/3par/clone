@@ -106,6 +106,7 @@ done < <(onedatastore show -x $DST_DSID | $XPATH \
                     /DATASTORE/TEMPLATE/NAMING_TYPE \
                     /DATASTORE/TEMPLATE/PORTALS \
                     /DATASTORE/TEMPLATE/PORTALS_NUM \
+                    /DATASTORE/TEMPLATE/RCG_IP \
                     /DATASTORE/TEMPLATE/QOS_ENABLE \
                     /DATASTORE/TEMPLATE/QOS_PRIORITY \
                     /DATASTORE/TEMPLATE/QOS_MAX_IOPS \
@@ -123,6 +124,7 @@ DST_COMPRESSION="${XPATH_ELEMENTS[j++]:-$COMPRESSION}"
 DST_NAMING_TYPE="${XPATH_ELEMENTS[j++]:-$NAMING_TYPE}"
 DST_PORTALS="${XPATH_ELEMENTS[j++]:-$PORTALS}"
 DST_PORTALS_NUM="${XPATH_ELEMENTS[j++]:-$PORTALS_NUM}"
+RCG_IP="${XPATH_ELEMENTS[j++]:-$RCG_IP}"
 DST_QOS_ENABLE="${XPATH_ELEMENTS[j++]:-$QOS_ENABLE}"
 DST_QOS_PRIORITY="${XPATH_ELEMENTS[j++]:-$QOS_PRIORITY}"
 DST_QOS_MAX_IOPS="${XPATH_ELEMENTS[j++]:-$QOS_MAX_IOPS}"
@@ -420,3 +422,34 @@ eval "exec ${FD}>&-"
 if flock -n "${FD}" 2>/dev/null; then
     rm -f "$LOCK_FILE"
 fi
+
+# ------------ Set up the replication ------------
+
+if [ -z "$RCG_IP" ]; then
+    exit 0
+fi
+
+start_ssh_connection "$DST_IP" "$USERNAME" "$PASSWORD"
+start_ssh_connection "$RCG_IP" "$USERNAME" "$PASSWORD"
+
+ssh_exec_and_log "$DST_IP" "creatercopygroup -usr_cpg ${DST_CPG} target:${DST_CPG} -snp_cpg ${DST_CPG} target:${DST_CPG}_snp $NAME ${RCG_IP}:sync" \
+    "Error creating sync replication group"
+
+ssh_exec_and_log "$DST_IP" "admitrcopyvv -createvv ${NAME} ${NAME} ${RCG_IP}:${NAME}" \
+    "Error adding primary VV to RCG"
+
+ssh_exec_and_log "$DST_IP" "startrcopygroup ${NAME}" \
+    "Error starting replication group"
+
+ssh_exec_and_log "$RCG_IP" "setvv -pol no_stale_ss ${NAME}" \
+    "Error setting no_stale_ss policy for VV"
+
+for i in 03 07 11 15 19 23; do
+    ssh_exec_and_log "$RCG_IP" "createsv -ro ${NAME}-${i} ${NAME}" \
+        "Error creating snapshot ${NAME}-${i}"
+done
+
+for i in 03 07 11 15 19 23; do
+    ssh_exec_and_log "$RCG_IP" "createvvset -add VVS_SNP_${i}h ${NAME}-${i}" \
+        "Error adding snapshot ${NAME}-${i} to corresponding VV sets"
+done
