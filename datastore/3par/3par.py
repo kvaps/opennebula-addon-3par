@@ -907,7 +907,7 @@ def createVVWithName(cl, name, args):
     return cl.getVolume(name)
 
 def deleteVVWithName(cl, name):
-    rcgName = ".".join(args.name.split(".")[:-1])
+    rcgName = ".".join(name.split(".")[:-1])
     try:
         cl.stopRemoteCopy(rcgName)
     except exceptions.HTTPNotFound:
